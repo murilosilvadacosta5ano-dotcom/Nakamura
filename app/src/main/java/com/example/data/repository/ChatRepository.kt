@@ -154,7 +154,7 @@ class ChatRepository(private val chatDao: ChatDao) {
             if (msgs.isNotEmpty()) {
                 sb.append("Conversa anterior: \"${session.title}\":\n")
                 msgs.forEach { m ->
-                    val roleName = if (m.role == "user") "Usuário" else "Gemini"
+                    val roleName = if (m.role == "user") "Usuário" else "Nakamura IA"
                     sb.append("  - $roleName: ${if (m.content.length > 100) m.content.take(100) + "..." else m.content}\n")
                 }
                 sb.append("\n")

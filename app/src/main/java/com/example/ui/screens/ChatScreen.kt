@@ -92,6 +92,33 @@ fun ChatScreen(
     var renameText by remember { mutableStateOf("") }
     var menuSessionId by remember { mutableStateOf<Long?>(null) }
 
+    // Custom flow states for Bottom Sheet, Canvas, Wikipedia and Image synthesis
+    var showPlusSheet by remember { mutableStateOf(false) }
+    var showCanvasDialog by remember { mutableStateOf(false) }
+    var canvasText by remember { mutableStateOf("") }
+    
+    var showWikipediaDialog by remember { mutableStateOf(false) }
+    var wikipediaQuery by remember { mutableStateOf("") }
+    var wikipediaResult by remember { mutableStateOf<String?>(null) }
+    var wikipediaLoading by remember { mutableStateOf(false) }
+
+    var showImageGenDialog by remember { mutableStateOf(false) }
+    var imageGenPrompt by remember { mutableStateOf("") }
+    var isGeneratingImage by remember { mutableStateOf(false) }
+    var imageProgress by remember { mutableFloatStateOf(0f) }
+    val animatedImageProgress by animateFloatAsState(
+        targetValue = imageProgress,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessVeryLow,
+            visibilityThreshold = 1 / 1000f,
+        ),
+        label = "imageProgress"
+    )
+
+    var isTopSearchVisible by remember { mutableStateOf(false) }
+    var isDrawerSearchExpanded by remember { mutableStateOf(true) } // Keep it open by default but with a toggle for sliding transition!
+
     // Colors aligned with Google Gemini brand guidelines
     val geminiDarkBackground = Color(0xFF131314)
     val geminiCardBackground = Color(0xFF1E1F20)
@@ -145,7 +172,7 @@ fun ChatScreen(
                                 colors = geminiSparkleColors
                             )
                             Text(
-                                text = "Gemini",
+                                text = "Nakamura IA",
                                 style = TextStyle(
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Normal,
@@ -209,36 +236,69 @@ fun ChatScreen(
                         }
                     }
 
-                    // 3. Search chats segment
+                    // 3. Search chats segment header with collapse/expand toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 20.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isDrawerSearchExpanded = !isDrawerSearchExpanded }
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Text(
+                            text = "BUSCAR HISTÓRICO",
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF444746),
+                                letterSpacing = 0.8.sp
+                            )
+                        )
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
+                            imageVector = if (isDrawerSearchExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Toggle search",
                             tint = Color(0xFF444746),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.setSearchQuery(it) },
-                            textStyle = TextStyle(color = Color(0xFF1F1F1F), fontSize = 14.sp),
-                            decorationBox = { innerTextField ->
-                                if (searchQuery.isEmpty()) {
-                                    Text("Search chats", color = Color(0xFF757575), fontSize = 14.sp)
-                                }
-                                innerTextField()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = isDrawerSearchExpanded,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Color(0xFF444746),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { viewModel.setSearchQuery(it) },
+                                textStyle = TextStyle(color = Color(0xFF1F1F1F), fontSize = 14.sp),
+                                decorationBox = { innerTextField ->
+                                    if (searchQuery.isEmpty()) {
+                                        Text("Buscar conversas...", color = Color(0xFF757575), fontSize = 14.sp)
+                                    }
+                                    innerTextField()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
 
                     // 4. Library segment
@@ -562,11 +622,7 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                val readableModelName = when (currentModel) {
-                                    "gemini-3.5-flash" -> "Gemini Flash"
-                                    "gemini-3.1-pro-preview" -> "Gemini Pro"
-                                    else -> "Gemini Flash"
-                                }
+                                val readableModelName = "Nano GPT Nakamura 2.5"
                                 Text(
                                     text = readableModelName,
                                     style = MaterialTheme.typography.titleMedium.copy(
@@ -588,16 +644,9 @@ fun ChatScreen(
                                 modifier = Modifier.background(geminiCardBackground)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Gemini Flash (Fast & Light)", color = Color.White) },
+                                    text = { Text("Nano GPT Nakamura 2.5", color = Color.White) },
                                     onClick = {
                                         viewModel.setModel("gemini-3.5-flash")
-                                        showModelMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Gemini Pro (Advanced reasoning)", color = Color.White) },
-                                    onClick = {
-                                        viewModel.setModel("gemini-3.1-pro-preview")
                                         showModelMenu = false
                                     }
                                 )
@@ -614,6 +663,13 @@ fun ChatScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { isTopSearchVisible = !isTopSearchVisible }) {
+                            Icon(
+                                imageVector = if (isTopSearchVisible) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = "Toggle search bar",
+                                tint = Color.White
+                            )
+                        }
                         IconButton(onClick = { viewModel.startNewChat() }) {
                             Icon(
                                 imageVector = Icons.Outlined.Edit,
@@ -659,6 +715,57 @@ fun ChatScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                // Top Search Bar reveal with spring slide-down animation
+                AnimatedVisibility(
+                    visible = isTopSearchVisible,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(geminiCardBackground)
+                            .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) {
+                                    Text("Filtrar conversas...", color = Color.Gray, fontSize = 14.sp)
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { viewModel.setSearchQuery("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear search",
+                                    tint = Color.LightGray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Core chat history output sheet
                 Box(
                     modifier = Modifier
@@ -802,7 +909,7 @@ fun ChatScreen(
                         ) {
                             // Plus sign multimodal icon
                             IconButton(
-                                onClick = { galleryLauncher.launch("image/*") },
+                                onClick = { showPlusSheet = true },
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
@@ -819,7 +926,7 @@ fun ChatScreen(
                                 onValueChange = { viewModel.setInputText(it) },
                                 placeholder = {
                                     Text(
-                                        text = "Ask Gemini",
+                                        text = "Fale com a Nakamura IA...",
                                         color = Color.Gray,
                                         fontSize = 16.sp
                                     )
@@ -946,33 +1053,23 @@ fun ChatScreen(
     }
 }
 
-// Google Gemini spark icon gradient visual graphic
+// Nakamura IA custom logo icon from Cloudinary loaded via Coil AsyncImage
 @Composable
 fun SparkleIcon(
     size: Int = 40,
-    colors: List<Color>,
+    colors: List<Color> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier.size(size.dp),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = this.size.width
-            val height = this.size.height
-
-            val brush = Brush.linearGradient(colors = colors)
-            val path = Path().apply {
-                // Classic four-pointed sparkle star shape
-                moveTo(width / 2f, 0f)
-                quadraticTo(width / 2f, height / 2f, width, height / 2f)
-                quadraticTo(width / 2f, height / 2f, width / 2f, height)
-                quadraticTo(width / 2f, height / 2f, 0f, height / 2f)
-                quadraticTo(width / 2f, height / 2f, width / 2f, 0f)
-                close()
-            }
-            drawPath(path = path, brush = brush)
-        }
+        coil.compose.AsyncImage(
+            model = "https://res.cloudinary.com/di9jolpim/image/upload/v1779405775/9_Sem_T%C3%ADtulo_20260521202134_kko5m8.png",
+            contentDescription = "Nakamura IA Icon",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
@@ -1410,7 +1507,7 @@ fun GeneratingIndicator(colors: List<Color>) {
             color = colors.firstOrNull() ?: Color(0xFF4285F4)
         )
         Text(
-            text = "Gemini está pensando...",
+            text = "Nakamura IA está pensando...",
             style = TextStyle(
                 fontSize = 13.sp,
                 color = Color.LightGray.copy(alpha = 0.8f),

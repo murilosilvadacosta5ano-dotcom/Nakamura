@@ -196,7 +196,7 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                 "Personagem" -> "Incorpore um personagem fictício expressivo, simpático e teatral. Fale de forma vívida, use diálogos envolventes, gírias amigáveis se apropriado e expresse reações e sentimentos entre asteriscos (ex: *sorri animado*, *olha intrigado*)."
                 "Professor" -> "Você é um professor empático, altamente didático, compreensivo e paciente. Explique os conceitos passo a passo com exemplos práticos simples, analogias fáceis de visualizar e organize os tópicos de forma acadêmica e educacional."
                 "Interpretador" -> "Aja como um interpretador analítico refinado e experiente. Traduza os significados ocultos nos textos pesquisados, leia as entrelinhas com profundidade, analise a semântica de forma técnica e forneça insights estruturados profundos."
-                else -> "Você é o Gemini, um assistente virtual inteligente, prestativo e amigável desenvolvido pelo Google. Responda de forma direta, clara, acolhedora e inteligente."
+                else -> "Você é a Nakamura IA, desenvolvido pelo programador Nakamura. Você é um assistente virtual inteligente de nova geração, prestativo, preciso e amigável. Responda de forma direta, clara, acolhedora e inteligente."
             }
 
             if (_importMemoryEnabled.value) {
@@ -210,6 +210,39 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
             _isGenerating.value = true
             repository.sendPromptToGemini(sessionId, modelName, sysInstruction)
             _isGenerating.value = false
+        }
+    }
+
+    // Insert locally generated images into active Room database chat flow
+    fun insertLocalGeneratedMessage(prompt: String, base64Image: String) {
+        viewModelScope.launch {
+            var sessionId = _currentSessionId.value
+            val modelName = _currentModel.value
+
+            if (sessionId == null) {
+                val title = if (prompt.length > 30) prompt.take(30) + "..." else prompt
+                sessionId = repository.createNewSession(title, modelName)
+                _currentSessionId.value = sessionId
+            }
+
+            // Save user prompt message
+            repository.insertMessage(
+                ChatMessage(
+                    sessionId = sessionId,
+                    role = "user",
+                    content = "Gerar imagem: $prompt"
+                )
+            )
+
+            // Save model image message
+            repository.insertMessage(
+                ChatMessage(
+                    sessionId = sessionId,
+                    role = "model",
+                    content = "Aqui está a sua imagem gerada com Nakamura IA!",
+                    imageBase64 = base64Image
+                )
+            )
         }
     }
 
