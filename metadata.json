@@ -1,0 +1,6 @@
+{
+  "name": "Gemini AI",
+  "description": "A fully functional, highly polished mobile assistant client for Google's Gemini AI Models, featuring dynamic chat, chat history persistence, and model choice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
