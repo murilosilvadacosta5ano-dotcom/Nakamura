@@ -32,7 +32,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.*
+import com.example.R
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -178,7 +180,8 @@ fun ChatScreen(
                         ) {
                             SparkleIcon(
                                 size = 26,
-                                colors = geminiSparkleColors
+                                colors = geminiSparkleColors,
+                                isThinking = isGenerating
                             )
                             Text(
                                 text = "Nakamura IA",
@@ -803,6 +806,7 @@ fun ChatScreen(
                         // Empty Welcome Screen mimicking the user's uploaded image exactly
                         WelcomeSplashScreen(
                             colors = geminiSparkleColors,
+                            isGenerating = isGenerating,
                             onChipClick = { promptText ->
                                 viewModel.setInputText(promptText)
                             }
@@ -817,11 +821,13 @@ fun ChatScreen(
                             contentPadding = PaddingValues(vertical = 16.dp)
                         ) {
                             items(messages, key = { it.id }) { msg ->
+                                val isLatestAiMessage = msg.role != "user" && messages.lastOrNull { it.role != "user" }?.id == msg.id
                                 MessageBubble(
                                     message = msg,
                                     colors = geminiSparkleColors,
                                     cardColor = geminiCardBackground,
-                                    accentColor = geminiAccentBlue
+                                    accentColor = geminiAccentBlue,
+                                    isThinking = isGenerating && isLatestAiMessage
                                 )
                             }
 
@@ -1162,23 +1168,102 @@ fun ChatScreen(
 }
 }
 
-// Nakamura IA custom logo icon from Cloudinary loaded via Coil AsyncImage
+// Nakamura IA custom logo icon from local resource with animated rotating ring in thinking state
 @Composable
 fun SparkleIcon(
     size: Int = 40,
     colors: List<Color> = emptyList(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isThinking: Boolean = false
 ) {
+    // Rotation state: when thinking, rotate the ring. Otherwise stop rotating.
+    val infiniteTransition = rememberInfiniteTransition(label = "Ring rotation")
+    val rotationAngle by if (isThinking) {
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2500, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "Rotation Angle"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
+
+    // Outer container layout
     Box(
-        modifier = modifier.size(size.dp),
+        modifier = modifier
+            .size((size * 1.51f).dp), // Extra space for the outer ring to be clear of borders
         contentAlignment = Alignment.Center
     ) {
-        coil.compose.AsyncImage(
-            model = "https://res.cloudinary.com/di9jolpim/image/upload/v1779405775/9_Sem_T%C3%ADtulo_20260521202134_kko5m8.png",
-            contentDescription = "Nakamura IA Icon",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
+        // 1. The rotating outer ring ("um anel em volta branco" + azul com branco e meio verde)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(rotationZ = rotationAngle)
+                .padding(2.dp)
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = (size / 15f).coerceAtLeast(1.5f).dp.toPx()
+                val r = (size * 0.60f).dp.toPx()
+                val arcSize = Size(r * 2, r * 2)
+                val arcTopLeft = Offset(center.x - r, center.y - r)
+                
+                // Draw the main white ring
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.85f),
+                    radius = r,
+                    style = Stroke(
+                        width = strokeWidth,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 10f), 0f) // Sleek dashed design
+                    )
+                )
+
+                // Draw secondary blue and green accent dots/arcs on the ring to match "azul com branco e verde"
+                drawArc(
+                    color = Color(0xFF1E88E5), // Blue accent
+                    startAngle = 45f,
+                    sweepAngle = 70f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth + 1.dp.toPx())
+                )
+
+                drawArc(
+                    color = Color(0xFF00E676), // Green accent
+                    startAngle = 225f,
+                    sweepAngle = 70f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth + 1.dp.toPx())
+                )
+            }
+        }
+
+        // 2. Central Core Icon with adaptive white borders/background
+        // This ensures high contrast against any background color ("tipo as bordas branca do ícone")
+        Box(
+            modifier = Modifier
+                .size(size.dp)
+                .shadow(4.dp, CircleShape)
+                .background(Color.White, CircleShape) // Adaptive background with white color
+                .border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape) // White border
+                .padding(1.dp), // Tiny padding to show the white board cleanly
+            contentAlignment = Alignment.Center
+        ) {
+            coil.compose.AsyncImage(
+                model = R.drawable.nakamura_logo,
+                contentDescription = "Nakamura IA Icon",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                contentScale = ContentScale.Fit
+            )
+        }
     }
 }
 
@@ -1231,6 +1316,7 @@ fun SuggestionChipCard(
 @Composable
 fun WelcomeSplashScreen(
     colors: List<Color>,
+    isGenerating: Boolean = false,
     onChipClick: (String) -> Unit
 ) {
     Box(
@@ -1278,6 +1364,7 @@ fun WelcomeSplashScreen(
                 SparkleIcon(
                     size = 54,
                     colors = colors,
+                    isThinking = isGenerating,
                     modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
                 )
             }
@@ -1386,6 +1473,7 @@ fun MessageBubble(
     colors: List<Color>,
     cardColor: Color,
     accentColor: Color,
+    isThinking: Boolean = false,
     onEditCode: (String) -> Unit = {}
 ) {
     val isUser = message.role == "user"
@@ -1409,7 +1497,7 @@ fun MessageBubble(
                         .background(cardColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    SparkleIcon(size = 18, colors = colors)
+                    SparkleIcon(size = 18, colors = colors, isThinking = isThinking)
                 }
             }
 

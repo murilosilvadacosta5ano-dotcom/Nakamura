@@ -128,20 +128,59 @@ val downloadLauncherLogo = tasks.register("downloadLauncherLogo") {
     notCompatibleWithConfigurationCache("Custom script task downloading launcher logo")
     doLast {
         val destFile = file("src/main/res/drawable/nakamura_logo.png")
-        if (!destFile.exists()) {
-            try {
-                destFile.parentFile.mkdirs()
-                val url = URI("https://res.cloudinary.com/di9jolpim/image/upload/v1779405775/9_Sem_T%C3%ADtulo_20260521202134_kko5m8.png").toURL()
-                val connection = url.openConnection()
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                val ins = connection.getInputStream()
-                val outs = destFile.outputStream()
-                ins.copyTo(outs)
-                ins.close()
-                outs.close()
-                println("SUCCESS: Nakamura AI launcher logo downloaded successfully!")
-            } catch (e: Exception) {
-                println("WARNING: Could not download Nakamura AI logo automatically: ${e.message}")
+        destFile.parentFile.mkdirs()
+        
+        // Search for user uploaded file
+        var foundFile: File? = null
+        val searchRoots = listOf(
+            file("/"),
+            file(".."),
+            file("."),
+            file("../.."),
+            file("/tmp")
+        )
+        for (root in searchRoots) {
+            if (root.exists()) {
+                try {
+                    root.walkTopDown()
+                        .maxDepth(10)
+                        .onFail { _, _ -> }
+                        .forEach {
+                            if (it.name.contains("file_00000000766871f58d60c50e95a6167f") || it.name.contains("766871f58d60")) {
+                                foundFile = it
+                            }
+                        }
+                } catch (e: Exception) {
+                    // Ignore search errors on specific root
+                }
+            }
+            if (foundFile != null) break
+        }
+        
+        if (foundFile != null) {
+            println("SUCCESS: Found user uploaded file at ${foundFile!!.absolutePath}")
+            foundFile!!.inputStream().use { input ->
+                destFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            println("SUCCESS: Copied user image to drawable/nakamura_logo.png")
+        } else {
+            println("WARNING: User uploaded file not found locally. Downloading fallback logo from Cloudinary...")
+            if (!destFile.exists()) {
+                try {
+                    val url = URI("https://res.cloudinary.com/di9jolpim/image/upload/v1779405775/9_Sem_T%C3%ADtulo_20260521202134_kko5m8.png").toURL()
+                    val connection = url.openConnection()
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    val ins = connection.getInputStream()
+                    val outs = destFile.outputStream()
+                    ins.copyTo(outs)
+                    ins.close()
+                    outs.close()
+                    println("SUCCESS: Nakamura AI launcher logo downloaded successfully!")
+                } catch (e: Exception) {
+                    println("WARNING: Could not download Nakamura AI logo automatically: ${e.message}")
+                }
             }
         }
     }
