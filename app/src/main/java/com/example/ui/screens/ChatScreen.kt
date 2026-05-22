@@ -80,6 +80,17 @@ fun ChatScreen(
     val selectedImageBase64 by viewModel.selectedImageBase64.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
 
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val isGuest by viewModel.isGuest.collectAsStateWithLifecycle()
+    val currentUserDisplayName by viewModel.currentUserDisplayName.collectAsStateWithLifecycle()
+
+    if (!isLoggedIn && !isGuest) {
+        GoogleAuthenticationScreen(
+            viewModel = viewModel
+        )
+        return
+    }
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var showVoiceDialog by remember { mutableStateOf(false) }
     var showModelMenu by remember { mutableStateOf(false) }
@@ -313,96 +324,7 @@ fun ChatScreen(
                         }
                     }
 
-                    // 4. Library segment
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                // Informative feedback
-                                coroutineScope.launch {
-                                    drawerState.close()
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Widgets,
-                            contentDescription = "Library",
-                            tint = Color(0xFF444746),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "Library",
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = Color(0xFF1F1F1F)
-                            )
-                        )
-                    }
 
-                    HorizontalDivider(color = Color(0xFFDDE3EA), modifier = Modifier.padding(vertical = 4.dp))
-
-                    // 5. Expandable "Notebooks" section
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { notebooksExpanded = !notebooksExpanded }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Notebooks",
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF444746)
-                            )
-                        )
-                        Icon(
-                            imageVector = if (notebooksExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                            contentDescription = "Toggle notebooks",
-                            tint = Color(0xFF444746),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    AnimatedVisibility(visible = notebooksExpanded) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    // Simulated event to matches design
-                                }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "New notebook",
-                                tint = Color(0xFF444746),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "New notebook",
-                                style = TextStyle(
-                                    fontSize = 13.sp,
-                                    color = Color(0xFF1F1F1F),
-                                    fontWeight = FontWeight.Normal
-                                )
-                            )
-                        }
-                    }
 
                     // 6. Expandable "Recents" section holding standard lists
                     Row(
@@ -580,7 +502,7 @@ fun ChatScreen(
                         }
                     }
 
-                    // 8. Custom Profile section at the bottom representing Murilo Silva
+                    // 8. Custom Profile section at the bottom representing dynamic Auth or Guest
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -596,20 +518,27 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF8AB4F8)),
+                                    .background(if (isLoggedIn) Color(0xFF4285F4) else Color(0xFF9E9E9E)),
                                 contentAlignment = Alignment.Center
                             ) {
+                                val initials = if (isLoggedIn) {
+                                    val parts = (currentUserDisplayName ?: "Usuário").split(" ")
+                                    if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+                                    else parts[0].take(2).uppercase()
+                                } else {
+                                    "CO"
+                                }
                                 Text(
-                                    text = "MS",
+                                    text = initials,
                                     style = TextStyle(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF041E49),
+                                        color = Color.White,
                                         fontSize = 13.sp
                                     )
                                 )
                             }
                             Text(
-                                text = "Murilo Silva",
+                                text = if (isLoggedIn) (currentUserDisplayName ?: "Usuário") else "Convidado",
                                 style = TextStyle(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -693,35 +622,28 @@ fun ChatScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { isTopSearchVisible = !isTopSearchVisible }) {
-                            Icon(
-                                imageVector = if (isTopSearchVisible) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = "Toggle search bar",
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(onClick = { viewModel.startNewChat() }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Edit,
-                                contentDescription = "Start manual chat",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
                         Box(
                             modifier = Modifier
                                 .padding(end = 12.dp)
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF4A4458))
-                                .border(1.dp, Color(0xFF938F99), CircleShape),
+                                .background(if (isLoggedIn) Color(0xFF4285F4) else Color(0xFF9E9E9E))
+                                .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                .clickable { showSettingsDialog = true },
                             contentAlignment = Alignment.Center
                         ) {
+                            val initials = if (isLoggedIn) {
+                                val parts = (currentUserDisplayName ?: "Usuário").split(" ")
+                                if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+                                else parts[0].take(2).uppercase()
+                            } else {
+                                "CO"
+                            }
                             Text(
-                                text = "JD",
+                                text = initials,
                                 style = TextStyle(
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFEADDFF),
+                                    color = Color.White,
                                     fontSize = 13.sp
                                 )
                             )
@@ -804,9 +726,15 @@ fun ChatScreen(
                 ) {
                     if (currentSessionId == null || messages.isEmpty()) {
                         // Empty Welcome Screen mimicking the user's uploaded image exactly
+                        val firstName = if (isLoggedIn) {
+                            (currentUserDisplayName ?: "Usuário").split(" ").firstOrNull() ?: "Usuário"
+                        } else {
+                            "Convidado"
+                        }
                         WelcomeSplashScreen(
                             colors = geminiSparkleColors,
                             isGenerating = isGenerating,
+                            userName = firstName,
                             onChipClick = { promptText ->
                                 viewModel.setInputText(promptText)
                             }
@@ -1317,6 +1245,7 @@ fun SuggestionChipCard(
 fun WelcomeSplashScreen(
     colors: List<Color>,
     isGenerating: Boolean = false,
+    userName: String = "Convidado",
     onChipClick: (String) -> Unit
 ) {
     Box(
@@ -1384,7 +1313,7 @@ fun WelcomeSplashScreen(
                             fontWeight = FontWeight.Medium
                         )
                     ) {
-                        append("Murilo")
+                        append(userName)
                     }
                 },
                 style = MaterialTheme.typography.headlineMedium.copy(
@@ -1636,12 +1565,22 @@ fun MessageBubble(
                             )
                         }
                     } else {
-                        // Nakamura formatting parser to handle block markdown layout gracefully
-                        MarkdownContent(
-                            text = message.content,
-                            cardColor = cardColor,
-                            onEditCode = onEditCode
-                        )
+                        val parsed = remember(message.content) { parseMsgWithCode(message.content) }
+                        if (parsed.second != null) {
+                            AiMessageCard(
+                                message = parsed.first,
+                                code = parsed.second,
+                                language = parsed.third,
+                                onEditCode = onEditCode
+                            )
+                        } else {
+                            // Nakamura formatting parser to handle block markdown layout gracefully
+                            MarkdownContent(
+                                text = message.content,
+                                cardColor = cardColor,
+                                onEditCode = onEditCode
+                            )
+                        }
                     }
                 }
             }
@@ -2427,6 +2366,23 @@ fun SettingsDialog(
                                     currentSection = "help"
                                 }
                             }
+
+                            // Part 3: Account Sign Out Group
+                            Card(
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                SettingsRow(
+                                    icon = Icons.Default.ExitToApp,
+                                    title = "Sair da Conta (Logout)",
+                                    iconTint = Color(0xFFD93025),
+                                    titleColor = Color(0xFFD93025)
+                                ) {
+                                    viewModel.logout()
+                                    onDismiss()
+                                }
+                            }
                         }
                     } else {
                         // Subscreen Content Pane
@@ -2807,6 +2763,8 @@ fun SettingsDialog(
 fun SettingsRow(
     icon: ImageVector,
     title: String,
+    iconTint: Color = Color(0xFF444746),
+    titleColor: Color = Color(0xFF1F1F1F),
     trailingContent: @Composable (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -2826,7 +2784,7 @@ fun SettingsRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF444746),
+                tint = iconTint,
                 modifier = Modifier.size(20.dp)
             )
             Text(
@@ -2834,7 +2792,7 @@ fun SettingsRow(
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color(0xFF1F1F1F)
+                    color = titleColor
                 )
             )
         }
@@ -3402,3 +3360,523 @@ fun PlusSheetListItem(
         )
     }
 }
+
+// Helper to isolate code blocks in responses
+fun parseMsgWithCode(text: String): Triple<String, String?, String> {
+    val startIdx = text.indexOf("```")
+    if (startIdx != -1) {
+        val endIdx = text.indexOf("```", startIdx + 3)
+        if (endIdx != -1) {
+            val beforeCode = text.substring(0, startIdx).trim()
+            val afterCode = text.substring(endIdx + 3).trim()
+            val codeWithLang = text.substring(startIdx + 3, endIdx).trim()
+            
+            var lang = "kotlin"
+            var code = codeWithLang
+            val firstLineBreak = codeWithLang.indexOf('\n')
+            if (firstLineBreak != -1) {
+                val potentialLang = codeWithLang.substring(0, firstLineBreak).trim()
+                if (potentialLang.isNotEmpty() && potentialLang.all { it.isLetterOrDigit() }) {
+                    lang = potentialLang
+                    code = codeWithLang.substring(firstLineBreak + 1)
+                }
+            }
+            
+            val message = if (beforeCode.isNotEmpty() && afterCode.isNotEmpty()) {
+                "$beforeCode\n\n$afterCode"
+            } else if (beforeCode.isNotEmpty()) {
+                beforeCode
+            } else {
+                afterCode
+            }
+            return Triple(message, code, lang)
+        }
+    }
+    return Triple(text, null, "kotlin")
+}
+
+@Composable
+fun AiMessageCard(
+    message: String,
+    code: String? = null,
+    language: String = "kotlin",
+    onEditCode: (String) -> Unit = {}
+) {
+    val context = LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF1E1F20), // Dark surface container
+            tonalElevation = 4.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White
+                )
+
+                if (code != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF111111),
+                        border = BorderStroke(
+                            1.dp,
+                            Color(0xFF2A2A2A)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF1A1A1A))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = language.uppercase(),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                // Edit button
+                                IconButton(
+                                    onClick = {
+                                        onEditCode(code)
+                                        Toast.makeText(context, "Código importado para edição!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Editar código",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                // Download/Save button
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val dir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                            val file = java.io.File(dir, "nakamura_code_${System.currentTimeMillis()}.${if(language.lowercase() == "kotlin") "kt" else "txt"}")
+                                            file.writeText(code)
+                                            Toast.makeText(context, "Código salvo em Downloads!", Toast.LENGTH_LONG).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Erro ao salvar código!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Baixar código",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                // Copy button
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(code))
+                                        Toast.makeText(context, "Código copiado!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copiar código",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                Text(
+                                    text = code,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    color = Color(0xFFDDDDDD),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 20.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GoogleAuthenticationScreen(
+    viewModel: ChatViewModel
+) {
+    val context = LocalContext.current
+    var isSimulatingAuth by remember { mutableStateOf(false) }
+    var showAccountChooser by remember { mutableStateOf(false) }
+    var showCustomNameInput by remember { mutableStateOf(false) }
+    var customName by remember { mutableStateOf("") }
+    var customEmail by remember { mutableStateOf("") }
+
+    val geminiDarkBackground = Color(0xFF131314)
+    val geminiSparkleColors = listOf(
+        Color(0xFF4285F4),
+        Color(0xFF9B72F4),
+        Color(0xFFF072B6)
+    )
+
+    // Infinite rotating transition to let the core glow beautifully
+    val infiniteTransition = rememberInfiniteTransition(label = "core_rotation")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "core_angle"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(geminiDarkBackground)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Nakamura AI Rotating Interactive Core Header
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .drawWithContent {
+                        drawContent()
+                        val stroke = 3.dp.toPx()
+                        val rRadius = size.minDimension / 2f
+                        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                        val angleOffset = rotationAngle
+
+                        // Outer glowing cosmic ring
+                        drawArc(
+                            brush = androidx.compose.ui.graphics.Brush.sweepGradient(geminiSparkleColors),
+                            startAngle = angleOffset,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = center - androidx.compose.ui.geometry.Offset(rRadius, rRadius),
+                            size = androidx.compose.ui.geometry.Size(rRadius * 2, rRadius * 2),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "Core Logo",
+                    tint = Color.White,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = "Nakamura IA",
+                style = TextStyle(
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                ),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Seu assistente virtual de nova geração com pesquisa contextualizada, geração de imagens e programador inteligente.",
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    height = 20.sp
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            if (isSimulatingAuth) {
+                CircularProgressIndicator(
+                    color = Color(0xFF4285F4),
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Acessando serviços Google Firebase...",
+                    color = Color.LightGray,
+                    fontSize = 13.sp
+                )
+            } else {
+                // Official style Google Sign In Button
+                Button(
+                    onClick = {
+                        showAccountChooser = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(50),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(52.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // Custom colorful Google G icon rendering
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .drawBehind {
+                                    // 4 segments of Google G color style
+                                    drawCircle(color = Color(0xFF4285F4), radius = 9.dp.toPx())
+                                    drawCircle(color = Color.White, radius = 5.6.dp.toPx())
+                                    drawRect(
+                                        color = Color.White,
+                                        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                        size = androidx.compose.ui.geometry.Size(9.dp.toPx(), 9.dp.toPx())
+                                    )
+                                    // Clean dynamic simulation for visual perfection
+                                }
+                        ) {
+                            Text(
+                                "G",
+                                color = Color(0xFF4285F4),
+                                style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Black),
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Text(
+                            text = "Fazer login com Google",
+                            color = Color(0xFF1F1F1F),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Guest option Button
+                OutlinedButton(
+                    onClick = {
+                        viewModel.continueAsGuest()
+                        Toast.makeText(context, "Acessando como Visitante (Imagens desabilitadas)", Toast.LENGTH_SHORT).show()
+                    },
+                    border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(52.dp)
+                ) {
+                    Text(
+                        text = "Continuar como Convidado",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+
+    // Custom accounts sheet simulator dialog
+    if (showAccountChooser) {
+        ModalBottomSheet(
+            onDismissRequest = { showAccountChooser = false },
+            containerColor = Color.White,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Escolha uma conta para prosseguir no app",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1F1F1F)
+                    )
+                )
+
+                // Option 1: Murilo Silva
+                Surface(
+                    onClick = {
+                        showAccountChooser = false
+                        isSimulatingAuth = true
+                        viewModel.loginWithGoogle("Murilo Silva", "murilosilvadac8@gmail.com", null)
+                        Toast.makeText(context, "Bem-vindo de volta, Murilo!", Toast.LENGTH_SHORT).show()
+                        isSimulatingAuth = false
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF1F3F4),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4285F4)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("MS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Column {
+                            Text("Murilo Silva", color = Color(0xFF1F1F1F), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("murilosilvadac8@gmail.com", color = Color.Gray, fontSize = 11.5.sp)
+                        }
+                    }
+                }
+
+                // Option 2: Add custom account
+                Surface(
+                    onClick = {
+                        showAccountChooser = false
+                        showCustomNameInput = true
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF1F3F4),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Adicionar conta",
+                            tint = Color.DarkGray
+                        )
+                        Text("Usar outra conta do Google", color = Color(0xFF1F1F1F), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
+    }
+
+    // Modal dialog for entering custom user name
+    if (showCustomNameInput) {
+        AlertDialog(
+            onDismissRequest = { showCustomNameInput = false },
+            containerColor = Color.White,
+            title = {
+                Text("Crie sua conta Google", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Digite seu nome e email para simular a autenticação Google Firebase com sucesso.", fontSize = 12.5.sp, color = Color.DarkGray)
+                    
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { customName = it },
+                        label = { Text("Nome Completo") },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = customEmail,
+                        onValueChange = { customEmail = it },
+                        label = { Text("E-mail Google") },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customName.isNotBlank() && customEmail.isNotBlank()) {
+                            showCustomNameInput = false
+                            isSimulatingAuth = true
+                            viewModel.loginWithGoogle(customName, customEmail, null)
+                            Toast.makeText(context, "Logado com sucesso!", Toast.LENGTH_SHORT).show()
+                            isSimulatingAuth = false
+                        } else {
+                            Toast.makeText(context, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4))
+                ) {
+                    Text("Conectar", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomNameInput = false }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            }
+        )
+    }
+}
+

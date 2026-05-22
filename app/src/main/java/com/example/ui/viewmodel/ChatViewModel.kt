@@ -42,6 +42,77 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     private val _importMemoryEnabled = MutableStateFlow(false)
     val importMemoryEnabled: StateFlow<Boolean> = _importMemoryEnabled.asStateFlow()
 
+    // Google Login and Guest Mode simulated state flows
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _isGuest = MutableStateFlow(false)
+    val isGuest: StateFlow<Boolean> = _isGuest.asStateFlow()
+
+    private val _currentUserDisplayName = MutableStateFlow<String?>(null)
+    val currentUserDisplayName: StateFlow<String?> = _currentUserDisplayName.asStateFlow()
+
+    private val _currentUserEmail = MutableStateFlow<String?>(null)
+    val currentUserEmail: StateFlow<String?> = _currentUserEmail.asStateFlow()
+
+    private val _currentUserPhotoUrl = MutableStateFlow<String?>(null)
+    val currentUserPhotoUrl: StateFlow<String?> = _currentUserPhotoUrl.asStateFlow()
+
+    // Holds image generation logs per user. Map structure: UserEmail -> (DateString -> Count)
+    private val _userImageGenCounts = MutableStateFlow<Map<String, Map<String, Int>>>(emptyMap())
+    val userImageGenCounts: StateFlow<Map<String, Map<String, Int>>> = _userImageGenCounts.asStateFlow()
+
+    fun loginWithGoogle(displayName: String, email: String, photoUrl: String?) {
+        _currentUserDisplayName.value = displayName
+        _currentUserEmail.value = email
+        _currentUserPhotoUrl.value = photoUrl
+        _isLoggedIn.value = true
+        _isGuest.value = false
+    }
+
+    fun continueAsGuest() {
+        _isLoggedIn.value = false
+        _isGuest.value = true
+        _currentUserDisplayName.value = null
+        _currentUserEmail.value = null
+        _currentUserPhotoUrl.value = null
+    }
+
+    fun logout() {
+        _isLoggedIn.value = false
+        _isGuest.value = false
+        _currentUserDisplayName.value = null
+        _currentUserEmail.value = null
+        _currentUserPhotoUrl.value = null
+    }
+
+    fun canGenerateImage(): Boolean {
+        if (_isGuest.value) return false
+        if (!_isLoggedIn.value) return false
+        val email = _currentUserEmail.value ?: "default"
+        val currentDate = getCurrentDateString()
+        val currentCounts = _userImageGenCounts.value
+        val userMap = currentCounts[email] ?: emptyMap()
+        val todayCount = userMap[currentDate] ?: 0
+        return todayCount < 4
+    }
+
+    fun incrementImageGenCount() {
+        val email = _currentUserEmail.value ?: "default"
+        val currentDate = getCurrentDateString()
+        val currentCounts = _userImageGenCounts.value.toMutableMap()
+        val userMap = (currentCounts[email] ?: emptyMap()).toMutableMap()
+        val todayCount = userMap[currentDate] ?: 0
+        userMap[currentDate] = todayCount + 1
+        currentCounts[email] = userMap
+        _userImageGenCounts.value = currentCounts
+    }
+
+    private fun getCurrentDateString(): String {
+        val sdf = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date())
+    }
+
     fun setImportMemoryEnabled(enabled: Boolean) {
         _importMemoryEnabled.value = enabled
     }
@@ -203,6 +274,31 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
             if (activeModeExtension == "image" || hasImageKeyword) {
                 _isGenerating.value = true
                 kotlinx.coroutines.delay(1200) // Delay to let the cute thinking animation render!
+                
+                if (_isGuest.value) {
+                    repository.insertMessage(
+                        ChatMessage(
+                            sessionId = sessionId,
+                            role = "model",
+                            content = "⚠️ Geração de Imagem indisponível no modo Convidado. Por favor, faça login com o Google para poder gerar imagens!"
+                        )
+                    )
+                    _isGenerating.value = false
+                    return@launch
+                }
+
+                if (!canGenerateImage()) {
+                    repository.insertMessage(
+                        ChatMessage(
+                            sessionId = sessionId,
+                            role = "model",
+                            content = "⚠️ Limite diário atingido! Você só pode gerar até 4 imagens por dia como usuário autenticado. Seu limite será renovado automaticamente à meia-noite."
+                        )
+                    )
+                    _isGenerating.value = false
+                    return@launch
+                }
+
                 val cleanPrompt = text.replace("gerar imagem", "")
                                       .replace("gerar", "")
                                       .replace("crie uma imagem", "")
@@ -218,6 +314,7 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                         content = imageUrl
                     )
                 )
+                incrementImageGenCount()
                 _isGenerating.value = false
                 return@launch
             }
@@ -238,6 +335,10 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                 "Professor" -> "Você é um professor empático, altamente didático, compreensivo e paciente. Explique os conceitos passo a passo com exemplos práticos simples, analogias fáceis de visualizar e organize os tópicos de forma acadêmica e educacional."
                 "Interpretador" -> "Aja como um interpretador analítico refinado e experiente. Traduza os significados ocultos nos textos pesquisados, leia as entrelinhas com profundidade, analise a semântica de forma técnica e forneça insights estruturados profundos."
                 else -> "Você é a Nakamura IA, desenvolvido pelo programador Nakamura. Você é um assistente virtual inteligente de nova geração, prestativo, preciso e amigável. Responda de forma direta, clara, acolhedora e inteligente."
+            }
+
+            if (activeModeExtension == "canvas") {
+                sysInstruction += "\n\n[INSTRUÇÃO CANVAS]: O usuário ativou o modo Canvas. Ele quer código ou desenvolvimento de software de alta performance. Certifique-se de cercar as partes de código/programa de forma isolada exclusivamente em blocos de crachas no formato ```[linguagem]\ncódigo\n``` para que o renderizador estético do aplicativo separe perfeitamente o código das mensagens explicativas ordinárias."
             }
 
             if (_importMemoryEnabled.value) {
