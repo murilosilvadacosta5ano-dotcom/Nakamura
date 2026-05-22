@@ -167,399 +167,50 @@ fun ChatScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color(0xFFF0F4F9),
+                drawerContainerColor = Color(0xFFF8F9FA),
                 drawerTonalElevation = 0.dp,
-                modifier = Modifier.width(300.dp),
+                modifier = Modifier.width(320.dp),
                 drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 12.dp)
-                ) {
-                    // 1. Top Core Header Block matching picture
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            SparkleIcon(
-                                size = 26,
-                                colors = geminiSparkleColors,
-                                isThinking = isGenerating
-                            )
-                            Text(
-                                text = "Nakamura IA",
-                                style = TextStyle(
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    color = Color(0xFF1F1F1F),
-                                    letterSpacing = (-0.5).sp
-                                )
-                            )
-                        }
-                        IconButton(
-                            onClick = { coroutineScope.launch { drawerState.close() } },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.MenuOpen,
-                                contentDescription = "Collapse menu",
-                                tint = Color(0xFF444746),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                GeminiNavigationDrawer(
+                    sessions = sessions,
+                    currentSessionId = currentSessionId,
+                    isLoggedIn = isLoggedIn,
+                    currentUserDisplayName = currentUserDisplayName,
+                    isGenerating = isGenerating,
+                    onConfiguracoesClick = { showSettingsDialog = true },
+                    onNovaConversaClick = {
+                        viewModel.startNewChat()
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    onSessionClick = { sessionId ->
+                        viewModel.selectSession(sessionId)
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    onSessionDelete = { sessionId ->
+                        viewModel.deleteSession(sessionId)
+                    },
+                    onSessionShare = {
+                        Toast.makeText(context, "Conversa compartilhada com sucesso!", Toast.LENGTH_SHORT).show()
+                    },
+                    onSessionPin = {
+                        Toast.makeText(context, "Conversa fixada no topo!", Toast.LENGTH_SHORT).show()
+                    },
+                    onSessionRename = { session ->
+                        sessionToRename = session
+                        renameText = session.title
+                    },
+                    onTriggerUpgrade = {
+                        showUpgradeDialog = true
+                    },
+                    onCloseDrawer = {
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    onSuggestionClick = { suggestion ->
+                        viewModel.setInputText(suggestion)
+                        coroutineScope.launch { drawerState.close() }
                     }
-
-                    // 2. Add New chat Rounded Pill Button
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 12.dp)
-                    ) {
-                        Surface(
-                            onClick = {
-                                viewModel.startNewChat()
-                                coroutineScope.launch { drawerState.close() }
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFFE3E3E3),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Edit,
-                                    contentDescription = "New chat",
-                                    tint = Color(0xFF1F1F1F),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "New chat",
-                                    style = TextStyle(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF1F1F1F)
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    // 3. Search chats segment header with collapse/expand toggle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 2.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { isDrawerSearchExpanded = !isDrawerSearchExpanded }
-                            .padding(horizontal = 4.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "BUSCAR HISTÓRICO",
-                            style = TextStyle(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF444746),
-                                letterSpacing = 0.8.sp
-                            )
-                        )
-                        Icon(
-                            imageVector = if (isDrawerSearchExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Toggle search",
-                            tint = Color(0xFF444746),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = isDrawerSearchExpanded,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White)
-                                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = Color(0xFF444746),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            BasicTextField(
-                                value = searchQuery,
-                                onValueChange = { viewModel.setSearchQuery(it) },
-                                textStyle = TextStyle(color = Color(0xFF1F1F1F), fontSize = 14.sp),
-                                decorationBox = { innerTextField ->
-                                    if (searchQuery.isEmpty()) {
-                                        Text("Buscar conversas...", color = Color(0xFF757575), fontSize = 14.sp)
-                                    }
-                                    innerTextField()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-
-
-                    // 6. Expandable "Recents" section holding standard lists
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { recentsExpanded = !recentsExpanded }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Recents",
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF444746)
-                            )
-                        )
-                        Icon(
-                            imageVector = if (recentsExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                            contentDescription = "Toggle recents",
-                            tint = Color(0xFF444746),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = recentsExpanded,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            if (sessions.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "Nenhum histórico recente",
-                                        style = TextStyle(fontSize = 13.sp, color = Color.Gray),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
-                                    )
-                                }
-                            } else {
-                                items(sessions, key = { it.id }) { session ->
-                                    val isSelected = session.id == currentSessionId
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(
-                                                if (isSelected) Color(0xFFE1E3E5) else Color.Transparent
-                                            )
-                                            .clickable {
-                                                viewModel.selectSession(session.id)
-                                                coroutineScope.launch { drawerState.close() }
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = session.title,
-                                            style = TextStyle(
-                                                fontSize = 13.5.sp,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = Color(0xFF1F1F1F)
-                                            ),
-                                            maxLines = 1,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .testTag("session_item_title_${session.id}")
-                                        )
-
-                                        Box {
-                                            IconButton(
-                                                onClick = { menuSessionId = session.id },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.MoreVert,
-                                                    contentDescription = "Session options",
-                                                    tint = Color(0xFF444746),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-
-                                            DropdownMenu(
-                                                expanded = menuSessionId == session.id,
-                                                onDismissRequest = { menuSessionId = null },
-                                                shape = RoundedCornerShape(20.dp),
-                                                modifier = Modifier.background(geminiCardBackground)
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Compartilhar conversa", color = Color.White) },
-                                                    leadingIcon = { Icon(Icons.Default.Share, "Share", tint = Color.White, modifier = Modifier.size(16.dp)) },
-                                                    onClick = {
-                                                        menuSessionId = null
-                                                        android.widget.Toast.makeText(context, "Conversa compartilhada com sucesso!", android.widget.Toast.LENGTH_SHORT).show()
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Fixar", color = Color.White) },
-                                                    leadingIcon = { Icon(Icons.Default.PushPin, "Pin", tint = Color.White, modifier = Modifier.size(16.dp)) },
-                                                    onClick = {
-                                                        menuSessionId = null
-                                                        android.widget.Toast.makeText(context, "Conversa fixada no topo!", android.widget.Toast.LENGTH_SHORT).show()
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Renomear", color = Color.White) },
-                                                    leadingIcon = { Icon(Icons.Default.Edit, "Rename", tint = Color.White, modifier = Modifier.size(16.dp)) },
-                                                    onClick = {
-                                                        menuSessionId = null
-                                                        sessionToRename = session
-                                                        renameText = session.title
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Excluir", color = Color.Red) },
-                                                    leadingIcon = { Icon(Icons.Default.Delete, "Delete", tint = Color.Red, modifier = Modifier.size(16.dp)) },
-                                                    onClick = {
-                                                        menuSessionId = null
-                                                        viewModel.deleteSession(session.id)
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 7. Bottom segment: Upgrade button styled like the picture
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Surface(
-                            onClick = { showUpgradeDialog = true },
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFFD3E3FD),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = Color(0xFF041E49),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Upgrade",
-                                    style = TextStyle(
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF041E49)
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    // 8. Custom Profile section at the bottom representing dynamic Auth or Guest
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isLoggedIn) Color(0xFF4285F4) else Color(0xFF9E9E9E)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val initials = if (isLoggedIn) {
-                                    val parts = (currentUserDisplayName ?: "Usuário").split(" ")
-                                    if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
-                                    else parts[0].take(2).uppercase()
-                                } else {
-                                    "CO"
-                                }
-                                Text(
-                                    text = initials,
-                                    style = TextStyle(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 13.sp
-                                    )
-                                )
-                            }
-                            Text(
-                                text = if (isLoggedIn) (currentUserDisplayName ?: "Usuário") else "Convidado",
-                                style = TextStyle(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF1F1F1F)
-                                )
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showSettingsDialog = true },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = "Settings",
-                                tint = Color(0xFF444746),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+                )
             }
         },
         modifier = modifier
@@ -848,14 +499,15 @@ fun ChatScreen(
                 }
 
                 // BOTTOM INPUT pill layout mimicking prompt page from the image
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                if (!showPlusSheet) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                     // Active Mode Extension Indicator Pill (e.g. image [x], wikipedia [x], canvas [x])
                     AnimatedVisibility(
                         visible = activeModeExtension != null,
