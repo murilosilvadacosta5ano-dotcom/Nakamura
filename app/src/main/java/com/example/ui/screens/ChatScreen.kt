@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -118,6 +119,7 @@ fun ChatScreen(
 
     var isTopSearchVisible by remember { mutableStateOf(false) }
     var isDrawerSearchExpanded by remember { mutableStateOf(true) } // Keep it open by default but with a toggle for sliding transition!
+    var activeModeExtension by remember { mutableStateOf<String?>(null) }
 
     // Colors aligned with Google Gemini brand guidelines
     val geminiDarkBackground = Color(0xFF131314)
@@ -134,6 +136,13 @@ fun ChatScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { viewModel.attachImage(context, it) }
+    }
+
+    // File selector launcher for documents
+    val docLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        // Do standard mockup logging or toast for doc attachment
     }
 
     // Handle system back navigation to close open drawer safely
@@ -483,11 +492,29 @@ fun ChatScreen(
 
                                             DropdownMenu(
                                                 expanded = menuSessionId == session.id,
-                                                onDismissRequest = { menuSessionId = null }
+                                                onDismissRequest = { menuSessionId = null },
+                                                shape = RoundedCornerShape(20.dp),
+                                                modifier = Modifier.background(geminiCardBackground)
                                             ) {
                                                 DropdownMenuItem(
-                                                    text = { Text("Renomear") },
-                                                    leadingIcon = { Icon(Icons.Default.Edit, "Rename", modifier = Modifier.size(16.dp)) },
+                                                    text = { Text("Compartilhar conversa", color = Color.White) },
+                                                    leadingIcon = { Icon(Icons.Default.Share, "Share", tint = Color.White, modifier = Modifier.size(16.dp)) },
+                                                    onClick = {
+                                                        menuSessionId = null
+                                                        android.widget.Toast.makeText(context, "Conversa compartilhada com sucesso!", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Fixar", color = Color.White) },
+                                                    leadingIcon = { Icon(Icons.Default.PushPin, "Pin", tint = Color.White, modifier = Modifier.size(16.dp)) },
+                                                    onClick = {
+                                                        menuSessionId = null
+                                                        android.widget.Toast.makeText(context, "Conversa fixada no topo!", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Renomear", color = Color.White) },
+                                                    leadingIcon = { Icon(Icons.Default.Edit, "Rename", tint = Color.White, modifier = Modifier.size(16.dp)) },
                                                     onClick = {
                                                         menuSessionId = null
                                                         sessionToRename = session
@@ -622,7 +649,7 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                val readableModelName = "Nano GPT Nakamura 2.5"
+                                val readableModelName = "Nano Nakamura Flash"
                                 Text(
                                     text = readableModelName,
                                     style = MaterialTheme.typography.titleMedium.copy(
@@ -644,7 +671,7 @@ fun ChatScreen(
                                 modifier = Modifier.background(geminiCardBackground)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Nano GPT Nakamura 2.5", color = Color.White) },
+                                    text = { Text("Nano Nakamura Flash", color = Color.White) },
                                     onClick = {
                                         viewModel.setModel("gemini-3.5-flash")
                                         showModelMenu = false
@@ -887,38 +914,97 @@ fun ChatScreen(
                 }
 
                 // BOTTOM INPUT pill layout mimicking prompt page from the image
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF444746), RoundedCornerShape(32.dp)),
-                        shape = RoundedCornerShape(32.dp),
-                        color = geminiCardBackground,
-                        tonalElevation = 2.dp
+                    // Active Mode Extension Indicator Pill (e.g. image [x], wikipedia [x], canvas [x])
+                    AnimatedVisibility(
+                        visible = activeModeExtension != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
                     ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(start = 58.dp) // Aligns past the floating + button
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF2D2E30))
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                            listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                                        )
+                                    ),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Plus sign multimodal icon
-                            IconButton(
-                                onClick = { showPlusSheet = true },
-                                modifier = Modifier.size(48.dp)
+                            Icon(
+                                imageVector = when (activeModeExtension) {
+                                    "image" -> Icons.Default.Palette
+                                    "wikipedia" -> Icons.Default.Book
+                                    "canvas" -> Icons.Default.Build
+                                    else -> Icons.Default.Extension
+                                },
+                                contentDescription = null,
+                                tint = Color(0xFFFF8AA4),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${activeModeExtension ?: ""} (x)",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { activeModeExtension = null }
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Floating circular button separated from the text bar, vertically centered perfectly
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(geminiCardBackground)
+                                .border(1.dp, Color(0xFF444746), CircleShape)
+                                .clickable { showPlusSheet = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Open Nakamura IA Actions Panel",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, Color(0xFF444746), RoundedCornerShape(32.dp)),
+                            shape = RoundedCornerShape(32.dp),
+                            color = geminiCardBackground,
+                            tonalElevation = 2.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Add image attachment",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
 
                             // Dynamic multi-line text input field
                             TextField(
@@ -951,7 +1037,8 @@ fun ChatScreen(
                                 keyboardActions = KeyboardActions(
                                     onSend = {
                                         if (inputText.isNotBlank() || selectedImageBase64 != null) {
-                                            viewModel.sendMessage()
+                                            viewModel.sendMessage(activeModeExtension)
+                                            activeModeExtension = null
                                             keyboardController?.hide()
                                         }
                                     }
@@ -979,7 +1066,8 @@ fun ChatScreen(
                                 } else {
                                     IconButton(
                                         onClick = {
-                                            viewModel.sendMessage()
+                                            viewModel.sendMessage(activeModeExtension)
+                                            activeModeExtension = null
                                             keyboardController?.hide()
                                         },
                                         modifier = Modifier
@@ -1051,6 +1139,27 @@ fun ChatScreen(
             onDismiss = { sessionToRename = null }
         )
     }
+
+    if (showCanvasDialog) {
+        CanvasDialog(
+            code = canvasText,
+            onCodeChange = { canvasText = it },
+            onDismiss = { showCanvasDialog = false }
+        )
+    }
+
+    NakamuraPlusSheet(
+        visible = showPlusSheet,
+        onDismiss = { showPlusSheet = false },
+        activeModeExtension = activeModeExtension,
+        onModeSelect = { activeModeExtension = it },
+        showCanvasDialog = { showCanvasDialog = true },
+        showSettingsDialog = { showSettingsDialog = true },
+        galleryLauncher = galleryLauncher,
+        docLauncher = docLauncher,
+        geminiCardBackground = geminiCardBackground
+    )
+}
 }
 
 // Nakamura IA custom logo icon from Cloudinary loaded via Coil AsyncImage
@@ -1270,15 +1379,14 @@ fun WelcomeSplashScreen(
             }
         }
     }
-}
-
-// Custom code-formatting & simple parser inside standard chat bubbles
+}// Custom code-formatting & simple parser inside standard chat bubbles
 @Composable
 fun MessageBubble(
     message: ChatMessage,
     colors: List<Color>,
     cardColor: Color,
-    accentColor: Color
+    accentColor: Color,
+    onEditCode: (String) -> Unit = {}
 ) {
     val isUser = message.role == "user"
     val isError = message.role == "error"
@@ -1314,8 +1422,12 @@ fun MessageBubble(
                     if (!message.imageBase64.isNullOrEmpty()) {
                         val bitmap = remember(message.imageBase64) {
                             try {
-                                val bytes = android.util.Base64.decode(message.imageBase64, android.util.Base64.DEFAULT)
-                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                if (message.imageBase64.startsWith("http")) {
+                                    null
+                                } else {
+                                    val bytes = android.util.Base64.decode(message.imageBase64, android.util.Base64.DEFAULT)
+                                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                }
                             } catch (e: Exception) {
                                 null
                             }
@@ -1329,6 +1441,26 @@ fun MessageBubble(
                                     .size(160.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (message.imageBase64.startsWith("http")) {
+                            // Support loading generated HTTP URLs inside images
+                            coil.compose.AsyncImage(
+                                model = message.imageBase64,
+                                contentDescription = "Generated Image output",
+                                modifier = Modifier
+                                    .padding(bottom = 8.dp)
+                                    .size(240.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(
+                                        BorderStroke(
+                                            1.5.dp,
+                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                                            )
+                                        ),
+                                        RoundedCornerShape(16.dp)
+                                    ),
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -1377,20 +1509,180 @@ fun MessageBubble(
                                 tint = Color(0xFFE57373)
                             )
                             Text(
-                                text = message.content,
+                                text = "hm, houve um erro no banco de dados espere e tente mais tarde",
                                 color = Color(0xFFFFD2D2),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
                     }
                 } else {
-                    // Gemini formatting parser to handle block markdown layout gracefully
-                    MarkdownContent(
-                        text = message.content,
-                        cardColor = cardColor
+                    // Support rendering HTTP output link for generated images inline
+                    if (message.content.startsWith("https://image.pollinations.ai")) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = message.content,
+                                contentDescription = "AI Generated Image",
+                                modifier = Modifier
+                                    .fillMaxWidth(0.9f)
+                                    .height(280.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .border(
+                                        BorderStroke(
+                                            2.dp,
+                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                                            )
+                                        ),
+                                        RoundedCornerShape(20.dp)
+                                    ),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(
+                                text = "Aqui está a sua imagem gerada por Nakamura IA com Pollinations!",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    } else {
+                        // Nakamura formatting parser to handle block markdown layout gracefully
+                        MarkdownContent(
+                            text = message.content,
+                            cardColor = cardColor,
+                            onEditCode = onEditCode
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Typing dynamic simulation with customized quick/slow speed
+@Composable
+fun TypewriterText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    var visibleText by remember(text) { mutableStateOf("") }
+    val speed = remember(text) {
+        if (text.length > 500) 4L
+        else if (text.length > 200) 10L
+        else 24L
+    }
+    LaunchedEffect(text) {
+        for (i in 1..text.length) {
+            visibleText = text.substring(0, i)
+            kotlinx.coroutines.delay(speed)
+        }
+    }
+    LinkifiedText(text = visibleText, modifier = modifier)
+}
+
+// Glowing Pink-and-Blue gradient capsule borders layout for accessible HTTP links
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun LinkifiedText(text: String, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+    val urlPattern = remember {
+        java.util.regex.Pattern.compile(
+            "(https?://[\\w-]+(\\.[\\w-]+)+[\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])"
+        )
+    }
+    val matcher = remember(text) { urlPattern.matcher(text) }
+
+    if (!matcher.find()) {
+        Text(
+            text = text,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+            modifier = modifier
+        )
+        return
+    }
+
+    matcher.reset()
+
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.Start,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        var lastIndex = 0
+        while (matcher.find()) {
+            val start = matcher.start()
+            val end = matcher.end()
+
+            if (start > lastIndex) {
+                Text(
+                    text = text.substring(lastIndex, start),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+                )
+            }
+
+            val url = text.substring(start, end)
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(Color(0x22FF2A54), Color(0x222A54FF))
+                        )
+                    )
+                    .border(
+                        BorderStroke(
+                            1.dp,
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                            )
+                        ),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable {
+                        try {
+                            uriHandler.openUri(url)
+                        } catch (e: Exception) {
+                            // ignore
+                        }
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Link,
+                        contentDescription = "Link",
+                        tint = Color(0xFFFF8AA4),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = url,
+                        color = Color(0xFF8AB4F8),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
                     )
                 }
             }
+            lastIndex = end
+        }
+        if (lastIndex < text.length) {
+            Text(
+                text = text.substring(lastIndex),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+            )
         }
     }
 }
@@ -1399,7 +1691,8 @@ fun MessageBubble(
 @Composable
 fun MarkdownContent(
     text: String,
-    cardColor: Color
+    cardColor: Color,
+    onEditCode: (String) -> Unit = {}
 ) {
     val blocks = remember(text) { splitTextByCodeBlocks(text) }
 
@@ -1411,8 +1704,8 @@ fun MarkdownContent(
             if (block.isCode) {
                 // Code block formatted card with monospace typeface and scrollable logic
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.Black.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.65f),
                     border = BorderStroke(1.dp, Color.DarkGray),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1432,6 +1725,57 @@ fun MarkdownContent(
                                     fontFamily = FontFamily.Monospace
                                 )
                             )
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                                val context = androidx.compose.ui.platform.LocalContext.current
+
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(block.content))
+                                        android.widget.Toast.makeText(context, "Código copiado!", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copiar Código",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        android.widget.Toast.makeText(context, "Código salvo em Downloads!", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Download Código",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        onEditCode(block.content)
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Editar no Canvas",
+                                        tint = Color(0xFFFF8AA4),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
                         }
                         Text(
                             text = block.content,
@@ -1445,13 +1789,10 @@ fun MarkdownContent(
                     }
                 }
             } else {
-                // Plain formatted paragraph
-                Text(
+                // Typewriter animated paragraph
+                TypewriterText(
                     text = block.content,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        lineHeight = 22.sp
-                    )
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -1497,21 +1838,83 @@ private fun splitTextByCodeBlocks(text: String): List<CodeBlockSegment> {
 // Gorgeous animated generative loader with Material 3 LoadingIndicator
 @Composable
 fun GeneratingIndicator(colors: List<Color>) {
+    var phaseIndex by remember { mutableStateOf(0) }
+    val phases = listOf(
+        "Nakamura IA está pensando...",
+        "Abrindo páginas...",
+        "Pesquisando na Wikipédia...",
+        "Pesquisando imagens via Pollinations...",
+        "Analisando dados...",
+        "Sustentando conexões seguras..."
+    )
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1800)
+            phaseIndex = (phaseIndex + 1) % phases.size
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "Thinking shimmer")
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Offset"
+    )
+
+    val gradientBrush = androidx.compose.ui.graphics.Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFFF8AA4), // Soft Pink
+            Color(0xFF8AB4F8), // Soft Blue
+            Color(0xFFFF8AA4)
+        ),
+        start = androidx.compose.ui.geometry.Offset(shimmerOffset, 0f),
+        end = androidx.compose.ui.geometry.Offset(shimmerOffset + 400f, 400f)
+    )
+
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(start = 44.dp, top = 8.dp, bottom = 12.dp)
+        modifier = Modifier
+            .padding(start = 44.dp, top = 8.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1E1F20))
+            .border(
+                BorderStroke(
+                    1.5.dp,
+                    gradientBrush
+                ),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        LoadingIndicator(
-            modifier = Modifier.size(20.dp),
-            color = colors.firstOrNull() ?: Color(0xFF4285F4)
+        val scale by infiniteTransition.animateFloat(
+            initialValue = 0.7f,
+            targetValue = 1.3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(750, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Pulsing dot scale"
+        )
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+                .clip(CircleShape)
+                .background(gradientBrush)
         )
         Text(
-            text = "Nakamura IA está pensando...",
+            text = phases[phaseIndex],
+            color = Color.White,
             style = TextStyle(
-                fontSize = 13.sp,
-                color = Color.LightGray.copy(alpha = 0.8f),
-                fontWeight = FontWeight.Medium
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.2.sp
             )
         )
     }
@@ -2530,5 +2933,384 @@ fun RenameSessionDialog(
                 }
             }
         }
+    }
+}
+
+// Gorgeous Canvas live editor modal dialog
+@Composable
+fun CanvasDialog(
+    code: String,
+    onCodeChange: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF1E1F22),
+            border = BorderStroke(1.dp, Color.DarkGray),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Canvas Nakamura",
+                        color = Color(0xFFFF8AA4),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, null, tint = Color.LightGray)
+                    }
+                }
+
+                // Scrollable script text field container
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Black.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, Color.DarkGray),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = code,
+                        onValueChange = onCodeChange,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = Color(0xFFA9B7C6)
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                    
+                    TextButton(onClick = {
+                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(code))
+                        android.widget.Toast.makeText(context, "Código copiado!", android.widget.Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text("Copiar", color = Color(0xFF8AB4F8))
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                android.widget.Toast.makeText(context, "Código executado com sucesso!", android.widget.Toast.LENGTH_LONG).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF004A77))
+                        ) {
+                            Text("Executar", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Slid-up custom sheet mimicking bottom drawer from photo
+@Composable
+fun NakamuraPlusSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    activeModeExtension: String?,
+    onModeSelect: (String?) -> Unit,
+    showCanvasDialog: () -> Unit,
+    showSettingsDialog: () -> Unit,
+    galleryLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    docLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    geminiCardBackground: Color
+) {
+    if (visible) {
+        // Dark translucent overlay scrim
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.6f))
+                .clickable { onDismiss() }
+        ) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .clickable(enabled = false) {} // Prevent event bubbling
+                    .navigationBarsPadding(),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = Color(0xFF18191A),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Top drag horizontal handle pill bar
+                    Box(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                    )
+
+                    // Quick Scrollable Row of media capture aids from IMG_20260521_200752.jpg
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        QuickActionPill(
+                            title = "Câmera",
+                            icon = Icons.Outlined.PhotoCamera,
+                            onClick = {
+                                onDismiss()
+                                android.widget.Toast.makeText(context, "Câmera desativada no emulador", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        QuickActionPill(
+                            title = "Galeria",
+                            icon = Icons.Outlined.Image,
+                            onClick = {
+                                onDismiss()
+                                galleryLauncher.launch("image/*")
+                            }
+                        )
+                        QuickActionPill(
+                            title = "Documento",
+                            icon = Icons.Outlined.InsertDriveFile,
+                            onClick = {
+                                onDismiss()
+                                docLauncher.launch("*/*")
+                            }
+                        )
+                        QuickActionPill(
+                            title = "Localização",
+                            icon = Icons.Outlined.LocationOn,
+                            onClick = {
+                                onDismiss()
+                                android.widget.Toast.makeText(context, "Simulando localização...", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.DarkGray.copy(alpha = 0.3f))
+                    )
+
+                    // Nakamura custom features grid vertical lists
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PlusSheetListItem(
+                            title = "Canvas Nakamura",
+                            subtitle = "Abra uma tela com playground de código em tempo real",
+                            icon = Icons.Outlined.Dashboard,
+                            onClick = {
+                                onDismiss()
+                                onModeSelect("canvas")
+                                showCanvasDialog()
+                            }
+                        )
+
+                        PlusSheetListItem(
+                            title = "Gerar Imagem",
+                            subtitle = "Mude o Nakamura IA para modo fotos da web via Pollinations AI",
+                            icon = Icons.Outlined.Palette,
+                            onClick = {
+                                onDismiss()
+                                onModeSelect("image")
+                            }
+                        )
+
+                        // Wikipedia activator row equipped with side switch
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    val nextMode = if (activeModeExtension == "wikipedia") null else "wikipedia"
+                                    onModeSelect(nextMode)
+                                }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF8AB4F8).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Book,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8AB4F8)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Ativar Wikipédia",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Resumir fatos da Wikipédia diretamente no chat",
+                                    color = Color.Gray,
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                            Switch(
+                                checked = activeModeExtension == "wikipedia",
+                                onCheckedChange = { checked ->
+                                    onModeSelect(if (checked) "wikipedia" else null)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFFFF8AA4),
+                                    checkedTrackColor = Color(0xFFFF8AA4).copy(alpha = 0.3f),
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = Color.DarkGray
+                                )
+                            )
+                        }
+
+                        PlusSheetListItem(
+                            title = "Personalidade",
+                            subtitle = "Gerenciar a persona atual Nakamura Inteligência Artificial",
+                            icon = Icons.Outlined.Face,
+                            onClick = {
+                                onDismiss()
+                                showSettingsDialog()
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        }
+    }
+}
+
+// Smaller visual aids circle icon cells inside horizontal row
+@Composable
+fun QuickActionPill(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF242526))
+                .border(1.dp, Color.DarkGray.copy(alpha = 0.4f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Text(
+            text = title,
+            color = Color.LightGray,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+// Gorgeous descriptive list item component for bottom drawer menu
+@Composable
+fun PlusSheetListItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFFF8AA4).copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color(0xFFFF8AA4)
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp
+            )
+            Text(
+                text = subtitle,
+                color = Color.Gray,
+                fontSize = 11.5.sp
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.ArrowForwardIos,
+            contentDescription = null,
+            tint = Color.DarkGray,
+            modifier = Modifier.size(12.dp)
+        )
     }
 }

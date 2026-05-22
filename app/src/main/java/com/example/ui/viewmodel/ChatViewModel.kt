@@ -156,7 +156,7 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         }
     }
 
-    fun sendMessage() {
+    fun sendMessage(activeModeExtension: String? = null) {
         val text = _inputText.value.trim()
         val base64 = _selectedImageBase64.value
         if (text.isEmpty() && base64 == null) return
@@ -189,6 +189,47 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
                 )
             )
 
+            // 1. IMAGE MODE / KEYWORDS SYNTHESIS DETECTOR:
+            val lowerText = text.lowercase()
+            val hasImageKeyword = lowerText.contains("gerar") || 
+                                  lowerText.contains("crie uma imagem") || 
+                                  lowerText.contains("faça uma imagem") || 
+                                  lowerText.contains("redesenhe") || 
+                                  lowerText.contains("mistura essas fotos") || 
+                                  lowerText.contains("chibi") || 
+                                  lowerText.contains("generate image") || 
+                                  lowerText.contains("create image")
+
+            if (activeModeExtension == "image" || hasImageKeyword) {
+                _isGenerating.value = true
+                kotlinx.coroutines.delay(1200) // Delay to let the cute thinking animation render!
+                val cleanPrompt = text.replace("gerar imagem", "")
+                                      .replace("gerar", "")
+                                      .replace("crie uma imagem", "")
+                                      .replace("faça uma imagem", "").trim()
+                val promptQuery = if (cleanPrompt.isEmpty()) "futuristic cyberpunk city neon pink" else cleanPrompt
+                val encodedPrompt = java.net.URLEncoder.encode(promptQuery, "UTF-8")
+                val imageUrl = "https://image.pollinations.ai/prompt/$encodedPrompt?width=800&height=800&nologo=true"
+                
+                repository.insertMessage(
+                    ChatMessage(
+                        sessionId = sessionId,
+                        role = "model",
+                        content = imageUrl
+                    )
+                )
+                _isGenerating.value = false
+                return@launch
+            }
+
+            // 2. WIKIPÉDIA MODE SEARCH & INTEGRATION:
+            var targetTextToSendOfGemini = text
+            if (activeModeExtension == "wikipedia") {
+                _isGenerating.value = true
+                val wikiSummary = fetchWikipediaSummary(text)
+                targetTextToSendOfGemini = "Com base no seguinte resumo obtido da Wikipédia: \"$wikiSummary\". Por favor, responda ou resuma inteligentemente à pergunta do usuário: $text"
+            }
+
             // Resolve modern personality prompt instruction matching user intent perfectly
             var sysInstruction = when (_selectedPersonality.value) {
                 "Modo História" -> "Você é um contador de histórias imersivo e criativo. Escreva de forma narrativa, detalhada, dramática, envolvente e artística, como se escrevesse uma jornada literária."
@@ -208,8 +249,49 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
             // Trigger Gemini generating text with contextual instruction
             _isGenerating.value = true
-            repository.sendPromptToGemini(sessionId, modelName, sysInstruction)
+            
+            // Custom repository wrapper to pass modified target text
+            if (activeModeExtension == "wikipedia") {
+                // If wikipedia, we can insert the query, fetch, and send to repository
+                repository.sendWikipediaPromptToGemini(sessionId, modelName, targetTextToSendOfGemini, sysInstruction)
+            } else {
+                repository.sendPromptToGemini(sessionId, modelName, sysInstruction)
+            }
+            
             _isGenerating.value = false
+        }
+    }
+
+    private suspend fun fetchWikipediaSummary(query: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val cleanQuery = query.replace("pesquisar", "")
+                                  .replace("wikipedia", "")
+                                  .replace("wikipédia", "").trim()
+            val encoded = java.net.URLEncoder.encode(cleanQuery, "UTF-8")
+            val url = java.net.URL("https://pt.wikipedia.org/api/rest_v1/page/summary/$encoded")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 6000
+            conn.readTimeout = 6000
+            
+            if (conn.responseCode == 200) {
+                val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+                val extractMarker = "\"extract\":\""
+                val index = responseText.indexOf(extractMarker)
+                if (index != -1) {
+                    val start = index + extractMarker.length
+                    val end = responseText.indexOf("\"", start)
+                    if (end != -1) {
+                        return@withContext responseText.substring(start, end)
+                            .replace("\\u00a0", " ")
+                            .replace("\\u2013", "-")
+                            .replace("\\\"", "\"")
+                    }
+                }
+            }
+            "Nenhum resumo enciclopédico exato foi encontrado na Wikipédia para '$cleanQuery'."
+        } catch (e: Exception) {
+            "Falha técnica ao acessar a base da Wikipédia: ${e.message}"
         }
     }
 

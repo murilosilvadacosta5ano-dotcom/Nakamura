@@ -162,4 +162,75 @@ class ChatRepository(private val chatDao: ChatDao) {
         }
         sb.toString()
     }
+
+    suspend fun sendWikipediaPromptToGemini(sessionId: Long, modelName: String, queryWithWikiText: String, systemInstruction: String? = null): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY" || apiKey.startsWith("MY_")) {
+            val configError = "Gemini API Key is not configured."
+            return@withContext Result.failure(Exception(configError))
+        }
+
+        val messagesSummary = chatDao.getMessagesForSessionSync(sessionId)
+            .filter { it.role == "user" || it.role == "model" }
+            
+        val contents = messagesSummary.mapIndexed { idx, msg ->
+            val parts = mutableListOf<Part>()
+            if (msg.role == "user" && idx == messagesSummary.lastIndex) {
+                parts.add(Part(text = queryWithWikiText))
+            } else {
+                if (!msg.imageBase64.isNullOrEmpty()) {
+                    parts.add(Part(inlineData = InlineData(mimeType = "image/jpeg", data = msg.imageBase64)))
+                }
+                parts.add(Part(text = msg.content))
+            }
+            Content(
+                parts = parts,
+                role = when (msg.role) {
+                    "user" -> "user"
+                    "model" -> "model"
+                    else -> "user"
+                }
+            )
+        }
+
+        if (contents.isEmpty()) {
+            return@withContext Result.failure(Exception("Cannot send empty content."))
+        }
+
+        val systemInstructionContent = systemInstruction?.let {
+            Content(parts = listOf(Part(text = it)))
+        }
+
+        val request = GenerateContentRequest(
+            contents = contents,
+            systemInstruction = systemInstructionContent
+        )
+        try {
+            val response = RetrofitClient.service.generateContent(modelName, apiKey, request)
+            val replyText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+            if (replyText != null) {
+                insertMessage(
+                    ChatMessage(
+                        sessionId = sessionId,
+                        role = "model",
+                        content = replyText
+                    )
+                )
+                Result.success(replyText)
+            } else {
+                val errorMsg = "Received empty response of model."
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: "Unknown API or Network error"
+            insertMessage(
+                ChatMessage(
+                    sessionId = sessionId,
+                    role = "error",
+                    content = "Error: $errorMsg"
+                )
+            )
+            Result.failure(e)
+        }
+    }
 }
