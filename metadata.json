@@ -1,6 +1,16 @@
 {
   "name": "Nakamura AI",
   "description": "A fully functional, highly polished mobile assistant client for Google's Gemini AI Models, featuring dynamic chat, chat history persistence, and model choice.",
+  "slug": "nakamura-ai",
+  "version": "1.0.0",
+  "icon": "./Nakamura.png",
+  "android": {
+    "adaptiveIcon": {
+      "foregroundImage": "./Nakamura.png",
+      "backgroundColor": "#0F0F0F"
+    },
+    "package": "com.seuusuario.nakamuraai"
+  },
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
