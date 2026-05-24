@@ -1,0 +1,36 @@
+name: Build do Aplicativo
+
+# Define quando o workflow será executado
+on:
+  push:
+    branches: [ "main", "master" ] # Roda sempre que houver push na main ou master
+  pull_request:
+    branches: [ "main", "master" ] # Roda quando abrirem PR para a main ou master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Máquina virtual onde o código vai rodar
+
+    steps:
+    # 1. Baixa o código do seu repositório para a máquina virtual
+    - name: Checkout do código
+      uses: actions/checkout@v4
+
+    # 2. Configura a versão do Node.js
+    - name: Configurar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # Mude para a versão que você usa
+        cache: 'npm'       # Ativa o cache para baixar os pacotes mais rápido
+
+    # 3. Instala as dependências do projeto
+    - name: Instalar dependências
+      run: npm ci
+
+    # 4. Roda o comando de Build
+    - name: Executar o Build do App
+      run: npm run build --if-present
+
+    # 5. (Opcional) Roda os testes para garantir que nada quebrou
+    - name: Rodar testes
+      run: npm test --if-present
