@@ -46,7 +46,7 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    private val _isGuest = MutableStateFlow(false)
+    private val _isGuest = MutableStateFlow(true)
     val isGuest: StateFlow<Boolean> = _isGuest.asStateFlow()
 
     private val _currentUserDisplayName = MutableStateFlow<String?>(null)

@@ -134,6 +134,9 @@ fun ChatScreen(
     var isDrawerSearchExpanded by remember { mutableStateOf(true) } // Keep it open by default but with a toggle for sliding transition!
     var activeModeExtension by remember { mutableStateOf<String?>(null) }
 
+    var showGoogleLoginDialog by remember { mutableStateOf(false) }
+    var showCopyButtonForId by remember { mutableStateOf<Long?>(null) }
+
     // Colors aligned with Google Gemini brand guidelines
     val geminiDarkBackground = Color(0xFF131314)
     val geminiCardBackground = Color(0xFF1E1F20)
@@ -273,31 +276,50 @@ fun ChatScreen(
                         }
                     },
                     actions = {
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 12.dp)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (isLoggedIn) Color(0xFF4285F4) else Color(0xFF9E9E9E))
-                                .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
-                                .clickable { showSettingsDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val initials = if (isLoggedIn) {
-                                val parts = (currentUserDisplayName ?: "Usuário").split(" ")
-                                if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
-                                else parts[0].take(2).uppercase()
-                            } else {
-                                "CO"
-                            }
-                            Text(
-                                text = initials,
-                                style = TextStyle(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 13.sp
+                        if (isLoggedIn) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 12.dp)
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF4285F4))
+                                    .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                    .clickable { showSettingsDialog = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val initials = {
+                                    val parts = (currentUserDisplayName ?: "Usuário").split(" ")
+                                    if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+                                    else parts[0].take(2).uppercase()
+                                }()
+                                Text(
+                                    text = initials,
+                                    style = TextStyle(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
                                 )
-                            )
+                            }
+                        } else {
+                            Button(
+                                onClick = { showGoogleLoginDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                                shape = RoundedCornerShape(16.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .wrapContentSize()
+                            ) {
+                                Text(
+                                    text = "(login)",
+                                    style = TextStyle(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 )
@@ -406,7 +428,19 @@ fun ChatScreen(
                                     colors = geminiSparkleColors,
                                     cardColor = geminiCardBackground,
                                     accentColor = geminiAccentBlue,
-                                    isThinking = isGenerating && isLatestAiMessage
+                                    isThinking = isGenerating && isLatestAiMessage,
+                                    onEditCode = { canvasText = it; showCanvasDialog = true },
+                                    showCopyButtonForId = showCopyButtonForId,
+                                    onLongPress = { id -> showCopyButtonForId = id },
+                                    onDismissCopyButton = { showCopyButtonForId = null },
+                                    onLinkAction = { action, url ->
+                                        if (action == "ask") {
+                                            viewModel.setInputText("Me fale sobre esse site/link: $url")
+                                        } else if (action == "search") {
+                                            viewModel.setInputText("Pesquisar sobre o link $url")
+                                            viewModel.sendMessage(activeModeExtension)
+                                        }
+                                    }
                                 )
                             }
 
@@ -900,151 +934,84 @@ fun WelcomeSplashScreen(
     userName: String = "Convidado",
     onChipClick: (String) -> Unit
 ) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentAlignment = Alignment.Center
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(top = 16.dp, bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "Sparkle scale")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 0.95f,
-                targetValue = 1.05f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(2000, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "Sparkle scale animation"
+            val sampleBubbles = listOf(
+                "girl what...",
+                "no like what do I say",
+                "just one answer",
+                "I farted so hard everyone's unconscious",
+                "I'm deporting you back to the Apple Store"
             )
-
-            Box(
-                modifier = Modifier.size(120.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Large radial glowing background sphere simulation matching the logo theme
+            sampleBubbles.forEach { text ->
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0xFF1A73E8).copy(alpha = 0.25f),
-                                    Color(0xFF8AB4F8).copy(alpha = 0.1f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
-                SparkleIcon(
-                    size = 54,
-                    colors = colors,
-                    isThinking = isGenerating,
-                    modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
-                )
-            }
-
-            Text(
-                text = buildAnnotatedString {
-                    append("Hello, ")
-                    withStyle(
-                        style = SpanStyle(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFF4285F4),
-                                    Color(0xFF91B9FF),
-                                    Color(0xFFD2E3FC)
-                                )
-                            ),
-                            fontWeight = FontWeight.Medium
-                        )
-                    ) {
-                        append(userName)
-                    }
-                },
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White
-                ),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "How can I help you today?",
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = Color(0xFFC4C7C5),
-                    fontWeight = FontWeight.Normal
-                ),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Suggestion Chips Grid
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                val suggestionItems = listOf(
-                    SuggestionChipItem(
-                        text = "Help me write a professional email",
-                        icon = Icons.Outlined.Lightbulb,
-                        iconColor = Color(0xFF8AB4F8)
-                    ),
-                    SuggestionChipItem(
-                        text = "Summarize my recent notes",
-                        icon = Icons.Outlined.Edit,
-                        iconColor = Color(0xFF8AB4F8)
-                    ),
-                    SuggestionChipItem(
-                        text = "Plan a weekend hiking trip",
-                        icon = Icons.Outlined.Explore,
-                        iconColor = Color(0xFF8AB4F8)
-                    ),
-                    SuggestionChipItem(
-                        text = "Debug a Python function",
-                        icon = Icons.Default.Code,
-                        iconColor = Color(0xFF8AB4F8)
-                    )
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.White)
+                        .clickable { onChipClick(text) }
+                        .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
-                    SuggestionChipCard(
-                        item = suggestionItems[0],
-                        onClick = { onChipClick(suggestionItems[0].text) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    SuggestionChipCard(
-                        item = suggestionItems[1],
-                        onClick = { onChipClick(suggestionItems[1].text) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    SuggestionChipCard(
-                        item = suggestionItems[2],
-                        onClick = { onChipClick(suggestionItems[2].text) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    SuggestionChipCard(
-                        item = suggestionItems[3],
-                        onClick = { onChipClick(suggestionItems[3].text) },
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = text,
+                        color = Color(0xFF1E1E1E),
+                        style = TextStyle(
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Normal
+                        )
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Hello!, $userName",
+                style = TextStyle(
+                    fontFamily = CherryBombFontFamily,
+                    fontSize = 28.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+            )
+
+            Text(
+                text = "Your chat style",
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+            )
+
+            Text(
+                text = "Playful, curious, and expressive with bursts of humor, quick reactions, and a mix of slang and candid emotional honesty in every message.",
+                style = TextStyle(
+                    fontSize = 14.5.sp,
+                    color = Color.LightGray,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 21.sp
+                ),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
     }
 }// Custom code-formatting & simple parser inside standard chat bubbles
@@ -1055,7 +1022,11 @@ fun MessageBubble(
     cardColor: Color,
     accentColor: Color,
     isThinking: Boolean = false,
-    onEditCode: (String) -> Unit = {}
+    onEditCode: (String) -> Unit = {},
+    showCopyButtonForId: Long? = null,
+    onLongPress: (Long) -> Unit = {},
+    onDismissCopyButton: () -> Unit = {},
+    onLinkAction: (String, String) -> Unit = { _, _ -> }
 ) {
     val isUser = message.role == "user"
     val isError = message.role == "error"
@@ -1135,7 +1106,7 @@ fun MessageBubble(
                         }
                     }
 
-                    // User text container bubble
+                    // User text container bubble with long-press copy support
                     if (message.content.isNotEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(
@@ -1145,12 +1116,18 @@ fun MessageBubble(
                                 bottomEnd = 4.dp
                             ),
                             color = cardColor,
-                            modifier = Modifier.border(1.dp, Color.DarkGray, RoundedCornerShape(
-                                topStart = 20.dp,
-                                topEnd = 20.dp,
-                                bottomStart = 20.dp,
-                                bottomEnd = 4.dp
-                            ))
+                            modifier = Modifier
+                                .border(1.dp, Color.DarkGray, RoundedCornerShape(
+                                    topStart = 20.dp,
+                                    topEnd = 20.dp,
+                                    bottomStart = 20.dp,
+                                    bottomEnd = 4.dp
+                                ))
+                                .pointerInput(message.id) {
+                                    detectTapGestures(
+                                        onLongPress = { onLongPress(message.id) }
+                                    )
+                                }
                         ) {
                             Text(
                                 text = message.content,
@@ -1185,53 +1162,113 @@ fun MessageBubble(
                         }
                     }
                 } else {
-                    // Support rendering HTTP output link for generated images inline
-                    if (message.content.startsWith("https://image.pollinations.ai")) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            coil.compose.AsyncImage(
-                                model = message.content,
-                                contentDescription = "AI Generated Image",
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .height(280.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .border(
-                                        BorderStroke(
-                                            2.dp,
-                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
-                                            )
-                                        ),
-                                        RoundedCornerShape(20.dp)
-                                    ),
-                                contentScale = ContentScale.Crop
-                            )
-                            Text(
-                                text = "Aqui está a sua imagem gerada por Nakamura IA com Pollinations!",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                    // AI Response card with long-press copy support
+                    Surface(
+                        color = Color.Transparent,
+                        modifier = Modifier.pointerInput(message.id) {
+                            detectTapGestures(
+                                onLongPress = { onLongPress(message.id) }
                             )
                         }
-                    } else {
-                        val parsed = remember(message.content) { parseMsgWithCode(message.content) }
-                        if (parsed.second != null) {
-                            AiMessageCard(
-                                message = parsed.first,
-                                code = parsed.second,
-                                language = parsed.third,
-                                onEditCode = onEditCode
-                            )
+                    ) {
+                        // Support rendering HTTP output link for generated images inline
+                        if (message.content.startsWith("https://image.pollinations.ai")) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                coil.compose.AsyncImage(
+                                    model = message.content,
+                                    contentDescription = "AI Generated Image",
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .height(280.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .border(
+                                            BorderStroke(
+                                                2.dp,
+                                                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                    listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                                                )
+                                            ),
+                                            RoundedCornerShape(20.dp)
+                                        ),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Text(
+                                    text = "Aqui está a sua imagem gerada por Nakamura IA com Pollinations!",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         } else {
-                            // Nakamura formatting parser to handle block markdown layout gracefully
-                            MarkdownContent(
-                                text = message.content,
-                                cardColor = cardColor,
-                                onEditCode = onEditCode
+                            val parsed = remember(message.content) { parseMsgWithCode(message.content) }
+                            Column {
+                                if (parsed.second != null) {
+                                    AiMessageCard(
+                                        message = parsed.first,
+                                        code = parsed.second,
+                                        language = parsed.third,
+                                        onEditCode = onEditCode
+                                    )
+                                } else {
+                                    // Nakamura formatting parser to handle block markdown layout gracefully
+                                    MarkdownContent(
+                                        text = message.content,
+                                        cardColor = cardColor,
+                                        onEditCode = onEditCode,
+                                        onLinkAction = onLinkAction
+                                    )
+                                }
+
+                                // If the AI searched some sites, display them styled with border bars at the bottom
+                                val simulatedSites = remember(message.content) {
+                                    if (message.content.lowercase().contains("wikipedia") || message.content.lowercase().contains("wikipédia")) {
+                                        listOf("https://pt.wikipedia.org/wiki/Google", "https://github.com/google/fonts")
+                                    } else if (message.content.length > 40) {
+                                        listOf("https://github.com/google/fonts", "https://stackoverflow.com/questions/tagged/kotlin")
+                                    } else {
+                                        emptyList()
+                                    }
+                                }
+                                if (simulatedSites.isNotEmpty()) {
+                                    ResearchedSitesRow(sites = simulatedSites)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Smooth animated floating copy button under bubble
+                AnimatedVisibility(
+                    visible = showCopyButtonForId == message.id,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Button(
+                        onClick = {
+                            clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(message.content))
+                            Toast.makeText(context, "Texto copiado!", Toast.LENGTH_SHORT).show()
+                            onDismissCopyButton()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.padding(top = 4.dp).align(if (isUser) Alignment.End else Alignment.Start)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Icon",
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
                             )
+                            Text("Copy text", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1244,7 +1281,8 @@ fun MessageBubble(
 @Composable
 fun TypewriterText(
     text: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLinkAction: (String, String) -> Unit = { _, _ -> }
 ) {
     var visibleText by remember(text) { mutableStateOf("") }
     val speed = remember(text) {
@@ -1258,13 +1296,17 @@ fun TypewriterText(
             kotlinx.coroutines.delay(speed)
         }
     }
-    LinkifiedText(text = visibleText, modifier = modifier)
+    LinkifiedText(text = visibleText, modifier = modifier, onLinkAction = onLinkAction)
 }
 
 // Glowing Pink-and-Blue gradient capsule borders layout for accessible HTTP links
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun LinkifiedText(text: String, modifier: Modifier = Modifier) {
+fun LinkifiedText(
+    text: String,
+    modifier: Modifier = Modifier,
+    onLinkAction: (String, String) -> Unit = { _, _ -> }
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
@@ -1275,11 +1317,28 @@ fun LinkifiedText(text: String, modifier: Modifier = Modifier) {
     }
     val matcher = remember(text) { urlPattern.matcher(text) }
 
+    var heldLinkUrl by remember { mutableStateOf<String?>(null) }
+
+    // Check if the current paragraph mimics a custom title text layout (starts with `#`, `**` or represents title blocks)
+    val isTitle = text.trim().startsWith("#") || text.trim().startsWith("**") || text.trim().startsWith("Título:") || text.trim().startsWith("Titulo:")
+    val cleanTextDisplay = text.replace("#", "").replace("**", "")
+
+    val textStyle = if (isTitle) {
+        TextStyle(
+            fontFamily = CherryBombFontFamily,
+            fontSize = 20.sp,
+            color = Color.White,
+            lineHeight = 26.sp
+        )
+    } else {
+        MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+    }
+
     if (!matcher.find()) {
         Text(
-            text = text,
+            text = cleanTextDisplay,
             color = Color.White,
-            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+            style = textStyle,
             modifier = modifier
         )
         return
@@ -1299,68 +1358,137 @@ fun LinkifiedText(text: String, modifier: Modifier = Modifier) {
 
             if (start > lastIndex) {
                 Text(
-                    text = text.substring(lastIndex, start),
+                    text = text.substring(lastIndex, start).replace("#", "").replace("**", ""),
                     color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+                    style = textStyle
                 )
             }
 
             val url = text.substring(start, end)
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        androidx.compose.ui.graphics.Brush.horizontalGradient(
-                            listOf(Color(0x22FF2A54), Color(0x222A54FF))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (heldLinkUrl == url) Color(0xFF1E1F20) else Color(0x22FF2A54)
                         )
-                    )
-                    .border(
-                        BorderStroke(
-                            1.dp,
-                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                        .pointerInput(url) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    heldLinkUrl = url
+                                },
+                                onTap = {
+                                    try {
+                                        uriHandler.openUri(url)
+                                    } catch (e: Exception) {}
+                                }
                             )
-                        ),
-                        RoundedCornerShape(8.dp)
-                    )
-                    .clickable {
-                        try {
-                            uriHandler.openUri(url)
-                        } catch (e: Exception) {
-                            // ignore
+                        }
+                        .border(
+                            BorderStroke(
+                                if (heldLinkUrl == url) 2.5.dp else 1.dp,
+                                if (heldLinkUrl == url) {
+                                    androidx.compose.ui.graphics.Brush.sweepGradient(
+                                        listOf(Color(0xFF4285F4), Color(0xFF9B72F4), Color(0xFFFF8AA4), Color(0xFF4285F4))
+                                    )
+                                } else {
+                                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                        listOf(Color(0xFFFF8AA4), Color(0xFF8AB4F8))
+                                    )
+                                }
+                            ),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Link,
+                            contentDescription = "Link",
+                            tint = Color(0xFFFF8AA4),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = url,
+                            color = Color(0xFF8AB4F8),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                        )
+                    }
+                }
+
+                // Drop-down options overlay for held links (copy link, ask link, search link)
+                AnimatedVisibility(
+                    visible = heldLinkUrl == url,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 4.dp, bottom = 4.dp)
+                            .background(Color(0xFF131314), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.DarkGray, RoundedCornerShape(12.dp))
+                            .padding(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(url))
+                                android.widget.Toast.makeText(context, "Link copiado!", android.widget.Toast.LENGTH_SHORT).show()
+                                heldLinkUrl = null
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222428)),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("copy link", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                onLinkAction("ask", url)
+                                heldLinkUrl = null
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222428)),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("ask link", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                onLinkAction("search", url)
+                                heldLinkUrl = null
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222428)),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("search link", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Link,
-                        contentDescription = "Link",
-                        tint = Color(0xFFFF8AA4),
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Text(
-                        text = url,
-                        color = Color(0xFF8AB4F8),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
-                    )
                 }
             }
             lastIndex = end
         }
         if (lastIndex < text.length) {
             Text(
-                text = text.substring(lastIndex),
+                text = text.substring(lastIndex).replace("#", "").replace("**", ""),
                 color = Color.White,
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+                style = textStyle
             )
         }
     }
@@ -1371,7 +1499,8 @@ fun LinkifiedText(text: String, modifier: Modifier = Modifier) {
 fun MarkdownContent(
     text: String,
     cardColor: Color,
-    onEditCode: (String) -> Unit = {}
+    onEditCode: (String) -> Unit = {},
+    onLinkAction: (String, String) -> Unit = { _, _ -> }
 ) {
     val blocks = remember(text) { splitTextByCodeBlocks(text) }
 
@@ -1471,7 +1600,8 @@ fun MarkdownContent(
                 // Typewriter animated paragraph
                 TypewriterText(
                     text = block.content,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    onLinkAction = onLinkAction
                 )
             }
         }
@@ -1517,42 +1647,30 @@ private fun splitTextByCodeBlocks(text: String): List<CodeBlockSegment> {
 // Gorgeous animated generative loader with Material 3 LoadingIndicator
 @Composable
 fun GeneratingIndicator(colors: List<Color>) {
-    var phaseIndex by remember { mutableStateOf(0) }
-    val phases = listOf(
-        "Nakamura IA está pensando...",
-        "Abrindo páginas...",
-        "Pesquisando na Wikipédia...",
-        "Pesquisando imagens via Pollinations...",
-        "Analisando dados...",
-        "Sustentando conexões seguras..."
-    )
+    var currentPhase by remember { mutableStateOf("Pensando...") }
+    var showSitesDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1800)
-            phaseIndex = (phaseIndex + 1) % phases.size
-        }
+        currentPhase = "Pensando..."
+        kotlinx.coroutines.delay(2500)
+        currentPhase = "Buscando nos sites..."
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "Thinking shimmer")
-    val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "Offset"
+    val simulatedSites = listOf(
+        "https://pt.wikipedia.org/wiki/Google",
+        "https://github.com/google/fonts",
+        "https://stackoverflow.com/questions/tagged/kotlin"
     )
 
-    val gradientBrush = androidx.compose.ui.graphics.Brush.linearGradient(
-        colors = listOf(
-            Color(0xFFFF8AA4), // Soft Pink
-            Color(0xFF8AB4F8), // Soft Blue
-            Color(0xFFFF8AA4)
+    val infiniteTransition = rememberInfiniteTransition(label = "border_glow")
+    val alphaAnim by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        start = androidx.compose.ui.geometry.Offset(shimmerOffset, 0f),
-        end = androidx.compose.ui.geometry.Offset(shimmerOffset + 400f, 400f)
+        label = "glow_alpha"
     )
 
     Row(
@@ -1561,41 +1679,109 @@ fun GeneratingIndicator(colors: List<Color>) {
         modifier = Modifier
             .padding(start = 44.dp, top = 8.dp, bottom = 12.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1E1F20))
+            .background(Color.White.copy(alpha = 0.12f))
             .border(
                 BorderStroke(
                     1.5.dp,
-                    gradientBrush
+                    Color.White.copy(alpha = alphaAnim) // Faint weak light edge glow
                 ),
                 RoundedCornerShape(12.dp)
             )
+            .clickable { showSitesDialog = true }
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         val scale by infiniteTransition.animateFloat(
-            initialValue = 0.7f,
-            targetValue = 1.3f,
+            initialValue = 0.8f,
+            targetValue = 1.2f,
             animationSpec = infiniteRepeatable(
-                animation = tween(750, easing = FastOutSlowInEasing),
+                animation = tween(1000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
-            label = "Pulsing dot scale"
+            label = "dots_pulsing"
         )
         Box(
             modifier = Modifier
-                .size(10.dp)
+                .size(8.dp)
                 .graphicsLayer(scaleX = scale, scaleY = scale)
                 .clip(CircleShape)
-                .background(gradientBrush)
+                .background(Color(0xFF4285F4))
         )
         Text(
-            text = phases[phaseIndex],
+            text = currentPhase,
             color = Color.White,
             style = TextStyle(
                 fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.2.sp
+                fontWeight = FontWeight.Bold
             )
         )
+    }
+
+    if (showSitesDialog) {
+        Dialog(onDismissRequest = { showSitesDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF1E1F20),
+                border = BorderStroke(1.dp, Color.DarkGray),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Fontes lidas por Nakamura IA:",
+                        style = TextStyle(
+                            fontFamily = CherryBombFontFamily,
+                            fontSize = 18.sp,
+                            color = Color.White
+                        )
+                    )
+                    Text(
+                        text = "A inteligência artificial Nakamura está processando as seguintes páginas da web para responder à sua dúvida:",
+                        style = TextStyle(fontSize = 12.sp, color = Color.Gray)
+                    )
+                    HorizontalDivider(color = Color.DarkGray)
+                    
+                    simulatedSites.forEach { site ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White.copy(alpha = 0.05f))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = site,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                color = Color(0xFF4285F4),
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Lido ✔",
+                                color = Color(0xFF43B581),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    Button(
+                        onClick = { showSitesDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2)),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Fechar", color = Color.White)
+                    }
+                }
+            }
+        }
     }
 }
 
