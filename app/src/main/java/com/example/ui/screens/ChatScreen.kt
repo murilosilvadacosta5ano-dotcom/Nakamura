@@ -2729,6 +2729,444 @@ fun CanvasDialog(
 }
 
 // Slid-up custom sheet mimicking bottom drawer from photo
+
+// True superellipse squircle shape implementation matching premium design guidelines
+val SquircleShape: androidx.compose.ui.graphics.Shape = object : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density
+    ): androidx.compose.ui.graphics.Outline {
+        val path = androidx.compose.ui.graphics.Path().apply {
+            val w = size.width
+            val h = size.height
+            // High fidelity cubic Bezier squircle shape
+            moveTo(0f, h / 2f)
+            cubicTo(0f, h * 0.08f, w * 0.08f, 0f, w / 2f, 0f)
+            cubicTo(w * 0.92f, 0f, w, h * 0.08f, w, h / 2f)
+            cubicTo(w, h * 0.92f, w * 0.92f, h, w / 2f, h)
+            cubicTo(w * 0.08f, h, 0f, h * 0.92f, 0f, h / 2f)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+@Composable
+fun GeminiNavigationDrawer(
+    sessions: List<ChatSession>,
+    currentSessionId: Long?,
+    isLoggedIn: Boolean,
+    currentUserDisplayName: String?,
+    isGenerating: Boolean,
+    onConfiguracoesClick: () -> Unit,
+    onNovaConversaClick: () -> Unit,
+    onSessionClick: (Long) -> Unit,
+    onSessionDelete: (Long) -> Unit,
+    onSessionShare: () -> Unit,
+    onSessionPin: () -> Unit,
+    onSessionRename: (ChatSession) -> Unit,
+    onTriggerUpgrade: () -> Unit,
+    onCloseDrawer: () -> Unit,
+    onSuggestionClick: (String) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var recentsExpanded by remember { mutableStateOf(true) }
+    var menuSessionId by remember { mutableStateOf<Long?>(null) }
+    
+    val filteredSessions = remember(sessions, searchQuery) {
+        if (searchQuery.isBlank()) {
+            sessions
+        } else {
+            sessions.filter { it.title.contains(searchQuery, ignoreCase = true) }
+        }
+    }
+
+    val geminiSparkleColors = listOf(
+        Color(0xFF4285F4),
+        Color(0xFF9B72F4),
+        Color(0xFFF072B6)
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF131314)) // Soft premium dark background
+            .padding(vertical = 16.dp, horizontal = 12.dp)
+            .navigationBarsPadding() // Keep it safe from system gestures/navigation bar
+    ) {
+        // 1. Header Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SparkleIcon(
+                    size = 24,
+                    colors = geminiSparkleColors,
+                    isThinking = isGenerating
+                )
+                Text(
+                    text = "Nakamura IA",
+                    style = TextStyle(
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        letterSpacing = (-0.5).sp
+                    )
+                )
+            }
+            IconButton(
+                onClick = { onCloseDrawer() },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MenuOpen,
+                    contentDescription = "Collapse menu",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 2. Add New chat Squircle Pill Button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            Surface(
+                onClick = onNovaConversaClick,
+                shape = SquircleShape,
+                color = Color(0xFF2E3032),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "New chat",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Nova conversa",
+                        style = TextStyle(
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 3. Search chats segment
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF202124))
+                .border(1.dp, Color(0xFF3C4043), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search",
+                tint = Color.Gray,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            BasicTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                decorationBox = { innerTextField ->
+                    if (searchQuery.isEmpty()) {
+                        Text("Buscar conversas...", color = Color.Gray, fontSize = 14.sp)
+                    }
+                    innerTextField()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 4. "Recentes" Expandable Section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { recentsExpanded = !recentsExpanded }
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Recentes",
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.LightGray
+                )
+            )
+            Icon(
+                imageVector = if (recentsExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Toggle recents",
+                tint = Color.Gray,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = recentsExpanded,
+            modifier = Modifier.weight(1f)
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (filteredSessions.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (searchQuery.isBlank()) "Sem conversas recentes" else "Nenhuma correspondência",
+                            style = TextStyle(fontSize = 13.sp, color = Color.Gray),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                        )
+                    }
+                } else {
+                    items(filteredSessions, key = { it.id }) { session ->
+                        val isSelected = session.id == currentSessionId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) Color(0xFF2D2E30) else Color.Transparent
+                                )
+                                .clickable {
+                                    onSessionClick(session.id)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChatBubbleOutline,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.White else Color.Gray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = session.title,
+                                    style = TextStyle(
+                                        fontSize = 13.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (isSelected) Color.White else Color.LightGray
+                                    ),
+                                    maxLines = 1,
+                                    modifier = Modifier.testTag("session_item_title_${session.id}")
+                                )
+                            }
+                            
+                            Box {
+                                IconButton(
+                                    onClick = { menuSessionId = session.id },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "Session options",
+                                        tint = Color.Gray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = menuSessionId == session.id,
+                                    onDismissRequest = { menuSessionId = null },
+                                    modifier = Modifier.background(Color(0xFF202124))
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Compartilhar", color = Color.White) },
+                                        leadingIcon = { Icon(Icons.Default.Share, "Share", tint = Color.White, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            menuSessionId = null
+                                            onSessionShare()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Fixar", color = Color.White) },
+                                        leadingIcon = { Icon(Icons.Default.PushPin, "Pin", tint = Color.White, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            menuSessionId = null
+                                            onSessionPin()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Renomear", color = Color.White) },
+                                        leadingIcon = { Icon(Icons.Default.Edit, "Rename", tint = Color.White, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            menuSessionId = null
+                                            onSessionRename(session)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Excluir", color = Color.Red) },
+                                        leadingIcon = { Icon(Icons.Default.Delete, "Delete", tint = Color.Red, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            menuSessionId = null
+                                            onSessionDelete(session.id)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 5. Upgrade Premium Button (Squircle shaped!)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp)
+        ) {
+            Surface(
+                onClick = onTriggerUpgrade,
+                shape = SquircleShape,
+                color = Color(0xFFC5E1A5), // Soft pastel green for premium feels
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color(0xFF1B5E20),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Upgrade Nakamura Pro",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B5E20)
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 6. Profile & Settings bottom segment
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(SquircleShape)
+                        .background(if (isLoggedIn) Color(0xFF4285F4) else Color(0xFF5F6368)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val initials = if (isLoggedIn) {
+                        val parts = (currentUserDisplayName ?: "Usuário").split(" ")
+                        if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+                        else parts[0].take(2).uppercase()
+                    } else {
+                        "CV"
+                    }
+                    Text(
+                        text = initials,
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    )
+                }
+                Column {
+                    Text(
+                        text = if (isLoggedIn) (currentUserDisplayName ?: "Usuário") else "Convidado",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    )
+                    Text(
+                        text = if (isLoggedIn) "Autenticado" else "Modo de Teste",
+                        style = TextStyle(
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onConfiguracoesClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Configurações",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NakamuraPlusSheet(
     visible: Boolean,
@@ -2742,188 +3180,165 @@ fun NakamuraPlusSheet(
     geminiCardBackground: Color
 ) {
     if (visible) {
-        // Dark translucent overlay scrim
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable { onDismiss() }
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            containerColor = Color(0xFF131314), // Dark theme match
+            tonalElevation = 8.dp,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.DarkGray) }
         ) {
-            Surface(
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .clickable(enabled = false) {} // Prevent event bubbling
-                    .navigationBarsPadding(),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                color = Color(0xFF18191A),
-                shadowElevation = 8.dp
+                    .navigationBarsPadding() // Keep safe from Android system navigation bar overlap
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 8.dp, bottom = 32.dp), // Extra generous padding for overlap handling
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
+                // Quick Scrollable Row of media capture aids
+                Row(
                     modifier = Modifier
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Top drag horizontal handle pill bar
-                    Box(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(Color.DarkGray)
+                    val context = LocalContext.current
+                    QuickActionPill(
+                        title = "Câmera",
+                        icon = Icons.Outlined.PhotoCamera,
+                        onClick = {
+                            onDismiss()
+                            Toast.makeText(context, "Câmera desativada no emulador", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    QuickActionPill(
+                        title = "Galeria",
+                        icon = Icons.Outlined.Image,
+                        onClick = {
+                            onDismiss()
+                            galleryLauncher.launch("image/*")
+                        }
+                    )
+                    QuickActionPill(
+                        title = "Documento",
+                        icon = Icons.Outlined.InsertDriveFile,
+                        onClick = {
+                            onDismiss()
+                            docLauncher.launch("*/*")
+                        }
+                    )
+                    QuickActionPill(
+                        title = "Localização",
+                        icon = Icons.Outlined.LocationOn,
+                        onClick = {
+                            onDismiss()
+                            Toast.makeText(context, "Simulando localização...", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.4f), thickness = 1.dp)
+
+                // Nakamura features Grid List
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    PlusSheetListItem(
+                        title = "Canvas Nakamura",
+                        subtitle = "Abra uma tela com playground de código em tempo real",
+                        icon = Icons.Outlined.Dashboard,
+                        onClick = {
+                            onDismiss()
+                            onModeSelect("canvas")
+                            showCanvasDialog()
+                        }
                     )
 
-                    // Quick Scrollable Row of media capture aids from IMG_20260521_200752.jpg
+                    PlusSheetListItem(
+                        title = "Gerar Imagem",
+                        subtitle = "Mude o Nakamura IA para modo fotos da web via Pollinations AI",
+                        icon = Icons.Outlined.Palette,
+                        onClick = {
+                            onDismiss()
+                            onModeSelect("image")
+                        }
+                    )
+
+                    // Wikipedia activator Row with custom Switch
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                val nextMode = if (activeModeExtension == "wikipedia") null else "wikipedia"
+                                onModeSelect(nextMode)
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        QuickActionPill(
-                            title = "Câmera",
-                            icon = Icons.Outlined.PhotoCamera,
-                            onClick = {
-                                onDismiss()
-                                android.widget.Toast.makeText(context, "Câmera desativada no emulador", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                        QuickActionPill(
-                            title = "Galeria",
-                            icon = Icons.Outlined.Image,
-                            onClick = {
-                                onDismiss()
-                                galleryLauncher.launch("image/*")
-                            }
-                        )
-                        QuickActionPill(
-                            title = "Documento",
-                            icon = Icons.Outlined.InsertDriveFile,
-                            onClick = {
-                                onDismiss()
-                                docLauncher.launch("*/*")
-                            }
-                        )
-                        QuickActionPill(
-                            title = "Localização",
-                            icon = Icons.Outlined.LocationOn,
-                            onClick = {
-                                onDismiss()
-                                android.widget.Toast.makeText(context, "Simulando localização...", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color.DarkGray.copy(alpha = 0.3f))
-                    )
-
-                    // Nakamura custom features grid vertical lists
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        PlusSheetListItem(
-                            title = "Canvas Nakamura",
-                            subtitle = "Abra uma tela com playground de código em tempo real",
-                            icon = Icons.Outlined.Dashboard,
-                            onClick = {
-                                onDismiss()
-                                onModeSelect("canvas")
-                                showCanvasDialog()
-                            }
-                        )
-
-                        PlusSheetListItem(
-                            title = "Gerar Imagem",
-                            subtitle = "Mude o Nakamura IA para modo fotos da web via Pollinations AI",
-                            icon = Icons.Outlined.Palette,
-                            onClick = {
-                                onDismiss()
-                                onModeSelect("image")
-                            }
-                        )
-
-                        // Wikipedia activator row equipped with side switch
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val nextMode = if (activeModeExtension == "wikipedia") null else "wikipedia"
-                                    onModeSelect(nextMode)
-                                }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .size(40.dp)
+                                .clip(SquircleShape)
+                                .background(Color(0xFF8AB4F8).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF8AB4F8).copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Book,
-                                    contentDescription = null,
-                                    tint = Color(0xFF8AB4F8)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Ativar Wikipédia",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "Resumir fatos da Wikipédia diretamente no chat",
-                                    color = Color.Gray,
-                                    fontSize = 11.5.sp
-                                )
-                            }
-                            Switch(
-                                checked = activeModeExtension == "wikipedia",
-                                onCheckedChange = { checked ->
-                                    onModeSelect(if (checked) "wikipedia" else null)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFFFF8AA4),
-                                    checkedTrackColor = Color(0xFFFF8AA4).copy(alpha = 0.3f),
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color.DarkGray
-                                )
+                            Icon(
+                                imageVector = Icons.Outlined.Book,
+                                contentDescription = null,
+                                tint = Color(0xFF8AB4F8)
                             )
                         }
-
-                        PlusSheetListItem(
-                            title = "Personalidade",
-                            subtitle = "Gerenciar a persona atual Nakamura Inteligência Artificial",
-                            icon = Icons.Outlined.Face,
-                            onClick = {
-                                onDismiss()
-                                showSettingsDialog()
-                            }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Ativar Wikipédia",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Resumir fatos da Wikipédia diretamente no chat",
+                                color = Color.Gray,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                        Switch(
+                            checked = activeModeExtension == "wikipedia",
+                            onCheckedChange = { checked ->
+                                onModeSelect(if (checked) "wikipedia" else null)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFFF8AA4),
+                                checkedTrackColor = Color(0xFFFF8AA4).copy(alpha = 0.3f),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.DarkGray
+                            )
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    PlusSheetListItem(
+                        title = "Personalidade",
+                        subtitle = "Gerenciar a persona atual Nakamura Inteligência Artificial",
+                        icon = Icons.Outlined.Face,
+                        onClick = {
+                            onDismiss()
+                            showSettingsDialog()
+                        }
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
 }
 
-// Smaller visual aids circle icon cells inside horizontal row
+// Small visuals cells using custom superellipse squircle shape
 @Composable
 fun QuickActionPill(
     title: String,
@@ -2940,9 +3355,9 @@ fun QuickActionPill(
         Box(
             modifier = Modifier
                 .size(52.dp)
-                .clip(CircleShape)
+                .clip(SquircleShape)
                 .background(Color(0xFF242526))
-                .border(1.dp, Color.DarkGray.copy(alpha = 0.4f), CircleShape),
+                .border(1.dp, Color.DarkGray.copy(alpha = 0.4f), SquircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -2961,7 +3376,7 @@ fun QuickActionPill(
     }
 }
 
-// Gorgeous descriptive list item component for bottom drawer menu
+// Descriptive list item using dynamic squircle design
 @Composable
 fun PlusSheetListItem(
     title: String,
@@ -2980,7 +3395,7 @@ fun PlusSheetListItem(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(SquircleShape)
                 .background(Color(0xFFFF8AA4).copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
