@@ -129,11 +129,29 @@ val downloadLauncherLogo = tasks.register("downloadLauncherLogo") {
     doLast {
         val destFile = file("src/main/res/drawable/nakamura_logo.png")
         destFile.parentFile.mkdirs()
+
+        // Automatically download custom Cherry Bomb One font
+        val fontDestFile = file("src/main/res/font/cherry_bomb_one.ttf")
+        fontDestFile.parentFile.mkdirs()
+        if (!fontDestFile.exists()) {
+            try {
+                val url = java.net.URI("https://raw.githubusercontent.com/google/fonts/main/ofl/cherrybombone/CherryBombOne-Regular.ttf").toURL()
+                val connection = url.openConnection()
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                connection.getInputStream().use { ins ->
+                    fontDestFile.outputStream().use { outs ->
+                        ins.copyTo(outs)
+                    }
+                }
+                println("SUCCESS: Cherry Bomb One font downloaded successfully!")
+            } catch (e: Exception) {
+                println("WARNING: Could not download Cherry Bomb One font: ${e.message}")
+            }
+        }
         
         // Search for user uploaded file
         var foundFile: File? = null
         val searchRoots = listOf(
-            file("/"),
             file(".."),
             file("."),
             file("../.."),

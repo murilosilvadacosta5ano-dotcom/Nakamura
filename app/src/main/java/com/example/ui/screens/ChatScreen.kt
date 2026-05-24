@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,6 +59,7 @@ import com.example.data.db.ChatMessage
 import com.example.data.db.ChatSession
 import androidx.compose.foundation.text.BasicTextField
 import com.example.ui.viewmodel.ChatViewModel
+import com.example.ui.theme.CherryBombFontFamily
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 
@@ -404,7 +406,7 @@ fun ChatScreen(
                         } else {
                             "Convidado"
                         }
-                        WelcomeSplashScreen(
+                        ChatWelcomeScreen(
                             colors = geminiSparkleColors,
                             isGenerating = isGenerating,
                             userName = firstName,
@@ -928,7 +930,7 @@ fun SuggestionChipCard(
 
 // Welcome Splash Screen centered visual matching the prompt picture
 @Composable
-fun WelcomeSplashScreen(
+fun ChatWelcomeScreen(
     colors: List<Color>,
     isGenerating: Boolean = false,
     userName: String = "Convidado",
