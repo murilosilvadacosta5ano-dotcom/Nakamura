@@ -55,19 +55,7 @@ class ChatRepository(private val chatDao: ChatDao) {
     }
 
     suspend fun sendPromptToGemini(sessionId: Long, modelName: String, systemInstruction: String? = null): Result<String> = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY" || apiKey.startsWith("MY_")) {
-            val configError = "Gemini API Key is not configured. Please add your API key in the Secrets panel in Google AI Studio to chat with Gemini."
-            // Save as an error message in chat history so the user receives a localized visual cue
-            insertMessage(
-                ChatMessage(
-                    sessionId = sessionId,
-                    role = "error",
-                    content = configError
-                )
-            )
-            return@withContext Result.failure(Exception(configError))
-        }
+        val apiKey = "AIzaSyBPRLVFopfW1xKJvO38PckSEYIPPLGuz0w"
 
         // Retrieve existing history excluding preceding "error" role messages to prevent model injection errors
         val messagesSummary = chatDao.getMessagesForSessionSync(sessionId)
@@ -128,15 +116,28 @@ class ChatRepository(private val chatDao: ChatDao) {
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            val errorMsg = e.message ?: "Unknown API or Network error"
+            val rawErrorMsg = e.message ?: ""
+            val isQuotaOrHttp = e is retrofit2.HttpException || 
+                                rawErrorMsg.contains("404") || 
+                                rawErrorMsg.contains("429") || 
+                                rawErrorMsg.contains("quota") || 
+                                rawErrorMsg.contains("Quota") || 
+                                rawErrorMsg.contains("limit") || 
+                                rawErrorMsg.contains("Limit") || 
+                                rawErrorMsg.contains("exceeded") || 
+                                rawErrorMsg.contains("Exceeded") || 
+                                rawErrorMsg.contains("RESOURCE_EXHAUSTED") || 
+                                rawErrorMsg.contains("exhausted")
+            
+            val displayMessage = if (isQuotaOrHttp) "tente mais tarde" else rawErrorMsg.ifBlank { "Erro desconhecido na rede" }
             insertMessage(
                 ChatMessage(
                     sessionId = sessionId,
                     role = "error",
-                    content = "Error: $errorMsg"
+                    content = displayMessage
                 )
             )
-            Result.failure(e)
+            Result.failure(Exception(displayMessage, e))
         }
     }
 
@@ -164,11 +165,7 @@ class ChatRepository(private val chatDao: ChatDao) {
     }
 
     suspend fun sendWikipediaPromptToGemini(sessionId: Long, modelName: String, queryWithWikiText: String, systemInstruction: String? = null): Result<String> = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY" || apiKey.startsWith("MY_")) {
-            val configError = "Gemini API Key is not configured."
-            return@withContext Result.failure(Exception(configError))
-        }
+        val apiKey = "AIzaSyBPRLVFopfW1xKJvO38PckSEYIPPLGuz0w"
 
         val messagesSummary = chatDao.getMessagesForSessionSync(sessionId)
             .filter { it.role == "user" || it.role == "model" }
@@ -222,15 +219,28 @@ class ChatRepository(private val chatDao: ChatDao) {
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            val errorMsg = e.message ?: "Unknown API or Network error"
+            val rawErrorMsg = e.message ?: ""
+            val isQuotaOrHttp = e is retrofit2.HttpException || 
+                                rawErrorMsg.contains("404") || 
+                                rawErrorMsg.contains("429") || 
+                                rawErrorMsg.contains("quota") || 
+                                rawErrorMsg.contains("Quota") || 
+                                rawErrorMsg.contains("limit") || 
+                                rawErrorMsg.contains("Limit") || 
+                                rawErrorMsg.contains("exceeded") || 
+                                rawErrorMsg.contains("Exceeded") || 
+                                rawErrorMsg.contains("RESOURCE_EXHAUSTED") || 
+                                rawErrorMsg.contains("exhausted")
+            
+            val displayMessage = if (isQuotaOrHttp) "tente mais tarde" else rawErrorMsg.ifBlank { "Erro desconhecido na rede" }
             insertMessage(
                 ChatMessage(
                     sessionId = sessionId,
                     role = "error",
-                    content = "Error: $errorMsg"
+                    content = displayMessage
                 )
             )
-            Result.failure(e)
+            Result.failure(Exception(displayMessage, e))
         }
     }
 }

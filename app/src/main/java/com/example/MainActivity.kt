@@ -5,12 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.example.data.db.GeminiDatabase
 import com.example.data.repository.ChatRepository
 import com.example.ui.screens.ChatScreen
+import com.example.ui.screens.WelcomeSplashScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.ChatViewModel
 import com.example.ui.viewmodel.ChatViewModelFactory
@@ -36,15 +41,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                // Instantiates the ViewModel using standard constructor injection pattern
-                val chatViewModel: ChatViewModel = viewModel(
-                    factory = ChatViewModelFactory(repository)
-                )
+                var showSplash by remember { mutableStateOf(true) }
 
-                ChatScreen(
-                    viewModel = chatViewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (showSplash) {
+                    WelcomeSplashScreen(
+                        onTimeout = { showSplash = false },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Instantiates the ViewModel using standard constructor injection pattern
+                    val chatViewModel: ChatViewModel = viewModel(
+                        factory = ChatViewModelFactory(repository)
+                    )
+
+                    ChatScreen(
+                        viewModel = chatViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
